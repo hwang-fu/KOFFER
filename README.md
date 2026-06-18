@@ -4,6 +4,9 @@
 
 A post-quantum hardware root of trust and security module, written in Rust.
 
+[![CI](https://github.com/hwang-fu/KOFFER/actions/workflows/ci.yml/badge.svg)](https://github.com/hwang-fu/KOFFER/actions/workflows/ci.yml)
+[![Rust](https://img.shields.io/badge/rust-1.96-orange.svg)](rust-toolchain.toml)
+
 </div>
 
 ## Workspace layout
