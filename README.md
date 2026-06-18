@@ -9,6 +9,17 @@ A post-quantum hardware root of trust and security module, written in Rust.
 
 </div>
 
+## The name
+
+**KOFFER** is German for "case" -- the secure case you carry your root of trust in, sized for a portable hardware token. The letters spell its pillars:
+
+- **K**eystore
+- **O**ne-time-safe
+- **F**irmware-signing
+- **F**orward-secret
+- **E**ndorsement
+- **R**oot
+
 ## Workspace layout
 
 | Folder | Package | Description |
