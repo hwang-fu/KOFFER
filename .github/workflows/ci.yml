@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  host:
+    name: host (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Provision pinned toolchain
+        run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --workspace --all-targets
+      - name: Test
+        run: cargo test --workspace
+      - name: Format
+        if: matrix.runner == 'ubuntu-latest'
+        run: cargo fmt --all --check
+      - name: Clippy
+        if: matrix.runner == 'ubuntu-latest'
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+  embedded:
+    name: embedded (thumbv8m.main-none-eabihf)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Provision pinned toolchain
+        run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - name: Build (no_std, Cortex-M33F)
+        run: cargo build --target thumbv8m.main-none-eabihf -p koffer-proto -p koffer-crypto
