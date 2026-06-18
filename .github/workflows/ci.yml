@@ -2,7 +2,18 @@ name: CI
 
 on:
   push:
-    branches: ['**']
+    branches: ["**"]
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "LICENSE"
+      - "**/*.png"
+      - "**/*.jpg"
+      - "**/*.jpeg"
+      - "**/*.gif"
+      - "**/*.svg"
+      - "**/*.ico"
+      - "**/*.webp"
 
 concurrency:
   group: ci-${{ github.ref }}
