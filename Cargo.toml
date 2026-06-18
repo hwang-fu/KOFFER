@@ -1,0 +1,8 @@
+[workspace]
+resolver = "3"
+members = ["crates/proto", "crates/crypto"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.96"
+repository = "https://github.com/hwang-fu/KOFFER"
