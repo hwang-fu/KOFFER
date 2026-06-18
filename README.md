@@ -1,6 +1,10 @@
+<div align="center">
+
 # KOFFER
 
 A post-quantum hardware root of trust and security module, written in Rust.
+
+</div>
 
 ## Workspace layout
 
