@@ -81,3 +81,16 @@ impl fmt::Display for AsciiStr<'_> {
 #[cfg(feature = "alloc")]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AsciiString(alloc::string::String);
+
+#[cfg(feature = "alloc")]
+impl AsciiString {
+    /// The validated string slice.
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+
+    /// Borrow this as an [`AsciiStr`] (no re-validation -- already validated on construction).
+    pub fn as_ascii_str(&self) -> AsciiStr<'_> {
+        AsciiStr(self.0.as_str())
+    }
+}
