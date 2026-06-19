@@ -7,6 +7,8 @@
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
+pub mod codec;
+
 #[cfg(test)]
 mod tests {
     #[test]
