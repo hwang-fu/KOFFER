@@ -9,3 +9,4 @@ extern crate alloc;
 
 pub mod ascii;
 pub mod codec;
+pub mod digest;
