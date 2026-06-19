@@ -94,3 +94,10 @@ impl AsciiString {
         AsciiStr(self.0.as_str())
     }
 }
+
+#[cfg(feature = "alloc")]
+impl AsRef<str> for AsciiString {
+    fn as_ref(&self) -> &str {
+        self.0.as_str()
+    }
+}
