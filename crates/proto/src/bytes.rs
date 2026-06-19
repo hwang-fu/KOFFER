@@ -39,3 +39,16 @@ impl<const MAX: usize> BoundedBytes<MAX> {
         self.0.as_slice()
     }
 }
+
+impl<const MAX: usize> TryFrom<&[u8]> for BoundedBytes<MAX> {
+    type Error = TooLong;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, TooLong> {
+        heapless::Vec::from_slice(bytes)
+            .map(Self)
+            .map_err(|_| TooLong {
+                len: bytes.len(),
+                max: MAX,
+            })
+    }
+}
