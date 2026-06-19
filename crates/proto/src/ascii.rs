@@ -271,6 +271,63 @@ mod tests {
         let decoded: Result<AsciiStr, _> = codec::decode(&wire);
         assert!(decoded.is_err());
     }
+
+    // ---- F15 input-canonicalization corpus ----
+
+    // Characters that look like printable ASCII but are not (homograph threat).
+    // Written as `\u{...}` escapes so the source stays ASCII and each one is explicit.
+    const CONFUSABLES: &[&str] = &[
+        "\u{0430}", // CYRILLIC SMALL LETTER A  (looks like 'a')
+        "\u{0435}", // CYRILLIC SMALL LETTER IE (looks like 'e')
+        "\u{043E}", // CYRILLIC SMALL LETTER O  (looks like 'o')
+        "\u{0440}", // CYRILLIC SMALL LETTER ER (looks like 'p')
+        "\u{0441}", // CYRILLIC SMALL LETTER ES (looks like 'c')
+        "\u{0445}", // CYRILLIC SMALL LETTER HA (looks like 'x')
+        "\u{03BF}", // GREEK SMALL LETTER OMICRON (looks like 'o')
+        "\u{0391}", // GREEK CAPITAL LETTER ALPHA (looks like 'A')
+        "\u{FF21}", // FULLWIDTH LATIN CAPITAL LETTER A
+        "\u{FF10}", // FULLWIDTH DIGIT ZERO
+        "\u{2044}", // FRACTION SLASH (looks like '/')
+        "\u{2010}", // HYPHEN (looks like '-')
+        "\u{2018}", // LEFT SINGLE QUOTATION MARK (looks like '\'')
+        "\u{00A0}", // NO-BREAK SPACE (looks like ' ')
+        "\u{200B}", // ZERO WIDTH SPACE (invisible)
+        "\u{FEFF}", // ZERO WIDTH NO-BREAK SPACE / BOM (invisible)
+    ];
+
+    #[test]
+    fn rejects_unicode_confusables() {
+        for s in CONFUSABLES {
+            assert!(
+                AsciiStr::try_from(*s).is_err(),
+                "confusable {s:?} should be rejected"
+            );
+        }
+    }
+
+    // Malformed UTF-8: overlong encodings, stray bytes, truncations, a surrogate.
+    const MALFORMED_UTF8: &[&[u8]] = &[
+        &[0xC0, 0xAF],             // overlong 2-byte '/'
+        &[0xC0, 0x80],             // overlong 2-byte NUL
+        &[0xC1, 0x81],             // overlong 2-byte 'A'
+        &[0xE0, 0x80, 0xAF],       // overlong 3-byte '/'
+        &[0xF0, 0x80, 0x80, 0xAF], // overlong 4-byte '/'
+        &[0x80],                   // lone continuation byte
+        &[0xFF],                   // invalid lead byte
+        &[0xC3],                   // truncated 2-byte sequence
+        &[0xE2, 0x82],             // truncated 3-byte sequence
+        &[0xED, 0xA0, 0x80],       // UTF-16 surrogate U+D800 (invalid in UTF-8)
+    ];
+
+    #[test]
+    fn rejects_malformed_utf8_corpus() {
+        for bytes in MALFORMED_UTF8 {
+            assert!(
+                AsciiStr::try_from(*bytes).is_err(),
+                "malformed {bytes:02X?} should be rejected"
+            );
+        }
+    }
 }
 
 #[cfg(all(test, feature = "alloc"))]
@@ -281,7 +338,7 @@ mod proptests {
 
     proptest! {
         #[test]
-        fn ascii_string_round_trips(bytes in proptest::collection::vec(0x20u8..=0x7e, 0..=64usize)) {
+        fn ascii_string_round_trips(bytes in proptest::collection::vec(PRINTABLE_ASCII, 0..=64usize)) {
             // Every byte is printable ASCII, so construction always succeeds.
             let text = String::from_utf8(bytes).unwrap();
             let original = AsciiString::try_from(text).unwrap();
@@ -290,6 +347,16 @@ mod proptests {
             let reencoded = codec::encode(&decoded).unwrap();
             prop_assert_eq!(decoded, original);
             prop_assert_eq!(reencoded, encoded);
+        }
+
+        // Construction succeeds iff the input is valid UTF-8 and every byte is printable ASCII.
+        #[test]
+        fn ascii_accepts_iff_printable(bytes in proptest::collection::vec(any::<u8>(), 0..=64usize)) {
+            let accepted = AsciiStr::try_from(bytes.as_slice()).is_ok();
+            let expected = core::str::from_utf8(&bytes)
+                .map(|s| s.bytes().all(|b| PRINTABLE_ASCII.contains(&b)))
+                .unwrap_or(false);
+            prop_assert_eq!(accepted, expected);
         }
     }
 }
