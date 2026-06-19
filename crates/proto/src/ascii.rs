@@ -337,9 +337,12 @@ mod proptests {
     use crate::codec;
     use proptest::prelude::*;
 
+    // Upper bound on the length of generated inputs.
+    const MAX_LEN: usize = 64;
+
     proptest! {
         #[test]
-        fn ascii_string_round_trips(bytes in proptest::collection::vec(PRINTABLE_ASCII, 0..=64usize)) {
+        fn ascii_string_round_trips(bytes in proptest::collection::vec(PRINTABLE_ASCII, 0..=MAX_LEN)) {
             // Every byte is printable ASCII, so construction always succeeds.
             let text = String::from_utf8(bytes).unwrap();
             let original = AsciiString::try_from(text).unwrap();
@@ -352,7 +355,7 @@ mod proptests {
 
         // Construction succeeds iff the input is valid UTF-8 and every byte is printable ASCII.
         #[test]
-        fn ascii_accepts_iff_printable(bytes in proptest::collection::vec(any::<u8>(), 0..=64usize)) {
+        fn ascii_accepts_iff_printable(bytes in proptest::collection::vec(any::<u8>(), 0..=MAX_LEN)) {
             let accepted = AsciiStr::try_from(bytes.as_slice()).is_ok();
             let expected = core::str::from_utf8(&bytes)
                 .map(|s| s.bytes().all(|b| PRINTABLE_ASCII.contains(&b)))
