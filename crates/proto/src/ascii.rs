@@ -4,6 +4,7 @@
 //! (0x20-0x7E). Bytes outside that range are rejected at the parse boundary, never silently
 //! transcoded.
 
+use crate::codec::{Decode, DecodeError, Decoder, Encode, EncodeError, Encoder, Write};
 use core::fmt;
 use core::ops::Deref;
 
@@ -74,6 +75,21 @@ impl Deref for AsciiStr<'_> {
 impl fmt::Display for AsciiStr<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.0)
+    }
+}
+
+impl<C> Encode<C> for AsciiStr<'_> {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), EncodeError<W::Error>> {
+        e.str(self.0)?.ok()
+    }
+}
+
+impl<'b, C> Decode<'b, C> for AsciiStr<'b> {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, DecodeError> {
+        let s = d.str()?;
+        validate(s.as_bytes())
+            .map_err(|_| DecodeError::message("input is not printable 7-bit US-ASCII"))?;
+        Ok(Self(s))
     }
 }
 
