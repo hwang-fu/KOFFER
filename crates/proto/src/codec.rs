@@ -8,7 +8,7 @@ pub use minicbor::{Decode, Decoder, Encode, Encoder};
 #[cfg(feature = "alloc")]
 pub fn encode<T>(
     value: &T,
-) -> Result<alloc::vec::Vec<u8>, minicbor::encode::Error<core::convert::Infallible>>
+) -> Result<alloc::vec::Vec<u8>, EncodeError<core::convert::Infallible>>
 where
     T: Encode<()>,
 {
@@ -16,7 +16,7 @@ where
 }
 
 /// Decode a value from CBOR bytes.
-pub fn decode<'b, T>(bytes: &'b [u8]) -> Result<T, minicbor::decode::Error>
+pub fn decode<'b, T>(bytes: &'b [u8]) -> Result<T, DecodeError>
 where
     T: Decode<'b, ()>,
 {
