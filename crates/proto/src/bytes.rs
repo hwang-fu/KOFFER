@@ -82,3 +82,70 @@ impl<'b, C, const MAX: usize> Decode<'b, C> for BoundedBytes<MAX> {
             .map_err(|_| DecodeError::message("byte sequence exceeds the maximum length"))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::codec;
+
+    #[test]
+    fn accepts_up_to_max() {
+        let bytes = [0u8; 4];
+        for len in 0..=4 {
+            let r = BoundedBytes::<4>::try_from(&bytes[..len]);
+            assert!(r.is_ok(), "len {len} should be accepted");
+            assert_eq!(r.unwrap().as_slice(), &bytes[..len]);
+        }
+    }
+
+    #[test]
+    fn rejects_over_max() {
+        let bytes = [0u8; 5];
+        let r = BoundedBytes::<4>::try_from(&bytes[..]);
+        assert_eq!(r, Err(TooLong { len: 5, max: 4 }));
+    }
+
+    #[test]
+    fn behaves_like_a_byte_slice() {
+        let bb = BoundedBytes::<4>::try_from(&[1u8, 2, 3][..]).unwrap();
+        assert_eq!(bb.len(), 3); // Deref -> slice::len
+        assert!(!bb.is_empty()); // Deref -> slice::is_empty
+        assert_eq!(bb[1], 2); // Deref -> slice indexing
+        assert_eq!(bb.first(), Some(&1)); // Deref -> slice::first
+    }
+
+    #[test]
+    fn decodes_byte_string_without_alloc() {
+        // CBOR byte string of length 3: 0x43 = major type 2 | length 3, then the bytes.
+        let wire = [0x43, 0xAA, 0xBB, 0xCC];
+        let bb: BoundedBytes<8> = codec::decode(&wire).expect("decode");
+        assert_eq!(bb.as_slice(), &[0xAA, 0xBB, 0xCC]);
+    }
+
+    #[test]
+    fn decode_rejects_over_max_on_the_wire() {
+        // A 3-byte byte string decoded into a BoundedBytes<2>.
+        let wire = [0x43, 0x01, 0x02, 0x03];
+        let r: Result<BoundedBytes<2>, _> = codec::decode(&wire);
+        assert!(r.is_err());
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn encodes_as_byte_string() {
+        let bb = BoundedBytes::<8>::try_from(&[1u8, 2, 3][..]).unwrap();
+        // 0x43 = CBOR byte string of length 3, then the raw bytes.
+        assert_eq!(codec::encode(&bb).expect("encode"), [0x43, 1, 2, 3]);
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn round_trip() {
+        let original = BoundedBytes::<16>::try_from(&[9u8; 10][..]).unwrap();
+        let bytes = codec::encode(&original).expect("encode");
+        let decoded: BoundedBytes<16> = codec::decode(&bytes).expect("decode");
+        assert_eq!(decoded, original);
+        // Deterministic: re-encoding yields identical bytes.
+        assert_eq!(codec::encode(&decoded).expect("re-encode"), bytes);
+    }
+}
