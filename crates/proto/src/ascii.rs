@@ -76,3 +76,8 @@ impl fmt::Display for AsciiStr<'_> {
         f.write_str(self.0)
     }
 }
+
+/// An owned string validated to contain only printable 7-bit US-ASCII.
+#[cfg(feature = "alloc")]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AsciiString(alloc::string::String);
