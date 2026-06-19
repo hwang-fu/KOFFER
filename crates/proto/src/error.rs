@@ -70,3 +70,74 @@ impl<'b, C> Decode<'b, C> for ErrorCode {
         Ok(Self::from(d.u32()?))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::codec;
+
+    const NAMED: [ErrorCode; 7] = [
+        ErrorCode::Malformed,
+        ErrorCode::UnsupportedAlgorithm,
+        ErrorCode::UnknownRequest,
+        ErrorCode::NotReady,
+        ErrorCode::ConsentDenied,
+        ErrorCode::VerificationFailed,
+        ErrorCode::Internal,
+    ];
+
+    #[test]
+    fn codepoints_are_stable() {
+        assert_eq!(ErrorCode::Malformed.codepoint(), 1);
+        assert_eq!(ErrorCode::UnsupportedAlgorithm.codepoint(), 2);
+        assert_eq!(ErrorCode::UnknownRequest.codepoint(), 3);
+        assert_eq!(ErrorCode::NotReady.codepoint(), 4);
+        assert_eq!(ErrorCode::ConsentDenied.codepoint(), 5);
+        assert_eq!(ErrorCode::VerificationFailed.codepoint(), 6);
+        assert_eq!(ErrorCode::Internal.codepoint(), 7);
+    }
+
+    #[test]
+    fn known_codes_map_to_named_variants() {
+        for code in NAMED {
+            // Each codepoint maps back to its named variant, never to Unknown.
+            assert_eq!(ErrorCode::from(code.codepoint()), code);
+        }
+    }
+
+    #[test]
+    fn unknown_code_is_preserved() {
+        assert_eq!(ErrorCode::from(99), ErrorCode::Unknown(99));
+        assert_eq!(ErrorCode::Unknown(99).codepoint(), 99);
+    }
+
+    #[test]
+    fn decodes_bare_integer_without_alloc() {
+        // CBOR unsigned integer 1 is a single byte: 0x01.
+        let wire = [0x01];
+        let code: ErrorCode = codec::decode(&wire).expect("decode");
+        assert_eq!(code, ErrorCode::Malformed);
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn encodes_as_bare_integer() {
+        // Malformed (codepoint 1) is the single byte 0x01, not a wrapped form.
+        assert_eq!(
+            codec::encode(&ErrorCode::Malformed).expect("encode"),
+            [0x01]
+        );
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn round_trip_named_and_unknown() {
+        for code in NAMED.into_iter().chain([ErrorCode::Unknown(99)]) {
+            let bytes = codec::encode(&code).expect("encode");
+            let decoded: ErrorCode = codec::decode(&bytes).expect("decode");
+            assert_eq!(decoded, code);
+            // Deterministic: re-encoding yields identical bytes.
+            assert_eq!(codec::encode(&decoded).expect("re-encode"), bytes);
+        }
+    }
+}
