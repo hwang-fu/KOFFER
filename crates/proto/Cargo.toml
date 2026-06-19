@@ -8,7 +8,7 @@ repository.workspace = true
 [features]
 default = []
 std = ["alloc"]
-alloc = []
+alloc = ["minicbor/alloc"]
 
 [dependencies]
 minicbor = { version = "2.2.2", default-features = false, features = ["derive"] }
