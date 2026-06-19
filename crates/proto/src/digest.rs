@@ -29,3 +29,9 @@ impl<const N: usize> From<[u8; N]> for Digest<N> {
         Digest::<N>::new(bytes)
     }
 }
+
+impl<const N: usize> AsRef<[u8]> for Digest<N> {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
