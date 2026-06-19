@@ -13,3 +13,6 @@ pub mod bytes;
 pub mod codec;
 pub mod digest;
 pub mod error;
+
+#[cfg(test)]
+mod testutil;

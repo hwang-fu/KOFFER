@@ -87,6 +87,7 @@ impl<'b, C, const MAX: usize> Decode<'b, C> for BoundedBytes<MAX> {
 mod tests {
     use super::*;
     use crate::codec;
+    use crate::testutil::BYTE_STRING;
 
     #[test]
     fn accepts_up_to_max() {
@@ -116,8 +117,8 @@ mod tests {
 
     #[test]
     fn decodes_byte_string_without_alloc() {
-        // CBOR byte string of length 3: 0x43 = major type 2 | length 3, then the bytes.
-        let wire = [0x43, 0xAA, 0xBB, 0xCC];
+        // CBOR byte string of length 3, then the bytes.
+        let wire = [BYTE_STRING | 3, 0xAA, 0xBB, 0xCC];
         let bb: BoundedBytes<8> = codec::decode(&wire).expect("decode");
         assert_eq!(bb.as_slice(), &[0xAA, 0xBB, 0xCC]);
     }
@@ -125,7 +126,7 @@ mod tests {
     #[test]
     fn decode_rejects_over_max_on_the_wire() {
         // A 3-byte byte string decoded into a BoundedBytes<2>.
-        let wire = [0x43, 0x01, 0x02, 0x03];
+        let wire = [BYTE_STRING | 3, 0x01, 0x02, 0x03];
         let r: Result<BoundedBytes<2>, _> = codec::decode(&wire);
         assert!(r.is_err());
     }
@@ -134,8 +135,11 @@ mod tests {
     #[test]
     fn encodes_as_byte_string() {
         let bb = BoundedBytes::<8>::try_from(&[1u8, 2, 3][..]).unwrap();
-        // 0x43 = CBOR byte string of length 3, then the raw bytes.
-        assert_eq!(codec::encode(&bb).expect("encode"), [0x43, 1, 2, 3]);
+        // CBOR byte string of length 3, then the raw bytes.
+        assert_eq!(
+            codec::encode(&bb).expect("encode"),
+            [BYTE_STRING | 3, 1, 2, 3]
+        );
     }
 
     #[cfg(feature = "alloc")]

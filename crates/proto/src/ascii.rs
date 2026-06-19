@@ -180,6 +180,7 @@ impl<'b, C> Decode<'b, C> for AsciiString {
 mod tests {
     use super::*;
     use crate::codec;
+    use crate::testutil::TEXT_STRING;
 
     #[test]
     fn accepts_every_printable_byte() {
@@ -230,8 +231,8 @@ mod tests {
 
     #[test]
     fn asciistr_decodes_from_cbor_without_alloc() {
-        // CBOR text string of length 3: 0x63 = major type 3 | length 3, then "abc".
-        let bytes = [0x63, b'a', b'b', b'c'];
+        // CBOR text string of length 3, then "abc".
+        let bytes = [TEXT_STRING | 3, b'a', b'b', b'c'];
         let s: AsciiStr = codec::decode(&bytes).expect("decode");
         assert_eq!(s.as_str(), "abc");
     }

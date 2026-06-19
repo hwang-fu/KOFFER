@@ -57,11 +57,12 @@ impl<'b, C, const N: usize> Decode<'b, C> for Digest<N> {
 mod tests {
     use super::*;
     use crate::codec;
+    use crate::testutil::BYTE_STRING;
 
     #[test]
     fn decodes_fixed_length_byte_string_without_alloc() {
-        // CBOR byte string of length 4: 0x44 = major type 2 | length 4.
-        let wire = [0x44, 0xDE, 0xAD, 0xBE, 0xEF];
+        // CBOR byte string of length 4, then the digest bytes.
+        let wire = [BYTE_STRING | 4, 0xDE, 0xAD, 0xBE, 0xEF];
         let d: Digest<4> = codec::decode(&wire).expect("decode");
         assert_eq!(d.as_bytes(), &[0xDE, 0xAD, 0xBE, 0xEF]);
     }
@@ -69,7 +70,7 @@ mod tests {
     #[test]
     fn decode_rejects_wrong_length() {
         // Byte string of length 3 decoded as Digest<4>.
-        let wire = [0x43, 0x01, 0x02, 0x03];
+        let wire = [BYTE_STRING | 3, 0x01, 0x02, 0x03];
         let r: Result<Digest<4>, _> = codec::decode(&wire);
         assert!(r.is_err());
     }
@@ -78,9 +79,12 @@ mod tests {
     #[test]
     fn encodes_as_byte_string_not_array() {
         let d = Digest::<3>::new([0x01, 0x02, 0x03]);
-        // 0x43 = CBOR byte string (major type 2) of length 3, then the raw bytes.
+        // CBOR byte string of length 3, then the raw bytes.
         // A derived encode of [u8; 3] would instead emit 0x83 (array of 3 integers).
-        assert_eq!(codec::encode(&d).expect("encode"), [0x43, 0x01, 0x02, 0x03]);
+        assert_eq!(
+            codec::encode(&d).expect("encode"),
+            [BYTE_STRING | 3, 0x01, 0x02, 0x03]
+        );
     }
 
     #[cfg(feature = "alloc")]
