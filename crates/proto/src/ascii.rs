@@ -121,3 +121,12 @@ impl TryFrom<alloc::string::String> for AsciiString {
         Ok(Self(s))
     }
 }
+
+#[cfg(feature = "alloc")]
+impl Deref for AsciiString {
+    type Target = str;
+
+    fn deref(&self) -> &str {
+        self.0.as_str()
+    }
+}
