@@ -130,3 +130,10 @@ impl Deref for AsciiString {
         self.0.as_str()
     }
 }
+
+#[cfg(feature = "alloc")]
+impl fmt::Display for AsciiString {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.0.as_str())
+    }
+}
