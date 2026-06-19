@@ -36,3 +36,9 @@ impl<'a> AsciiStr<'a> {
         self.0
     }
 }
+
+impl AsRef<str> for AsciiStr<'_> {
+    fn as_ref(&self) -> &str {
+        self.0
+    }
+}
