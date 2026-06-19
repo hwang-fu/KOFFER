@@ -49,6 +49,6 @@ impl<'b, C, const N: usize> Decode<'b, C> for Digest<N> {
         let bytes = d.bytes()?;
         let array = <[u8; N]>::try_from(bytes)
             .map_err(|_| DecodeError::message("digest has wrong length"))?;
-        Ok(Self(array))
+        Ok(Self::new(array))
     }
 }
