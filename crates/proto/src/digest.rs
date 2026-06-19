@@ -1,5 +1,7 @@
 //! Fixed-size cryptographic digests.
 
+use crate::codec::{Decode, DecodeError, Decoder, Encode, EncodeError, Encoder, Write};
+
 /// A fixed-size hash digest of `N` bytes.
 ///
 /// Encoded on the wire as a CBOR byte string (never an array of integers); decoding
@@ -33,5 +35,20 @@ impl<const N: usize> From<[u8; N]> for Digest<N> {
 impl<const N: usize> AsRef<[u8]> for Digest<N> {
     fn as_ref(&self) -> &[u8] {
         &self.0
+    }
+}
+
+impl<C, const N: usize> Encode<C> for Digest<N> {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), EncodeError<W::Error>> {
+        e.bytes(&self.0)?.ok()
+    }
+}
+
+impl<'b, C, const N: usize> Decode<'b, C> for Digest<N> {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, DecodeError> {
+        let bytes = d.bytes()?;
+        let array = <[u8; N]>::try_from(bytes)
+            .map_err(|_| DecodeError::message("digest has wrong length"))?;
+        Ok(Self(array))
     }
 }
