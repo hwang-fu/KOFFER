@@ -4,11 +4,14 @@ pub use minicbor::decode::Error as DecodeError;
 pub use minicbor::encode::{Error as EncodeError, Write};
 pub use minicbor::{Decode, Decoder, Encode, Encoder};
 
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
+#[cfg(feature = "alloc")]
+use core::convert::Infallible;
+
 /// Encode a value to a CBOR byte vector. Requires the `alloc` feature.
 #[cfg(feature = "alloc")]
-pub fn encode<T>(
-    value: &T,
-) -> Result<alloc::vec::Vec<u8>, EncodeError<core::convert::Infallible>>
+pub fn encode<T>(value: &T) -> Result<Vec<u8>, EncodeError<Infallible>>
 where
     T: Encode<()>,
 {
