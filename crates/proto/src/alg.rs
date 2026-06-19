@@ -8,13 +8,17 @@
 pub struct AlgId(i64);
 
 impl AlgId {
-    /// Wrap a raw algorithm codepoint.
     pub const fn new(id: i64) -> Self {
         Self(id)
     }
 
-    /// The raw algorithm codepoint.
     pub const fn get(self) -> i64 {
         self.0
+    }
+}
+
+impl From<i64> for AlgId {
+    fn from(id: i64) -> Self {
+        Self::new(id)
     }
 }
