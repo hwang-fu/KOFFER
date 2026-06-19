@@ -273,7 +273,7 @@ mod tests {
         assert!(decoded.is_err());
     }
 
-    // ---- F15 input-canonicalization corpus ----
+    // ---- Input-canonicalization corpus ----
 
     // Characters that look like printable ASCII but are not (homograph threat).
     // Written as `\u{...}` escapes so the source stays ASCII and each one is explicit.
