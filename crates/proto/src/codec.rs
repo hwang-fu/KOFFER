@@ -6,7 +6,7 @@ pub use minicbor::{Decode, Decoder, Encode, Encoder};
 
 /// Encode a value to a CBOR byte vector. Requires the `alloc` feature.
 #[cfg(feature = "alloc")]
-pub fn to_cbor<T>(
+pub fn encode<T>(
     value: &T,
 ) -> Result<alloc::vec::Vec<u8>, minicbor::encode::Error<core::convert::Infallible>>
 where
@@ -16,7 +16,7 @@ where
 }
 
 /// Decode a value from CBOR bytes.
-pub fn from_cbor<'b, T>(bytes: &'b [u8]) -> Result<T, minicbor::decode::Error>
+pub fn decode<'b, T>(bytes: &'b [u8]) -> Result<T, minicbor::decode::Error>
 where
     T: Decode<'b, ()>,
 {
@@ -25,7 +25,7 @@ where
 
 #[cfg(all(test, feature = "alloc"))]
 mod tests {
-    use super::{Decode, Encode, from_cbor, to_cbor};
+    use super::{Decode, Encode, decode, encode};
 
     #[derive(Encode, Decode, Debug, PartialEq)]
     struct Sample {
@@ -39,12 +39,12 @@ mod tests {
     fn round_trip() {
         let value = Sample { a: 7, b: 42 };
 
-        let bytes = to_cbor(&value).expect("encode");
-        let decoded: Sample = from_cbor(&bytes).expect("decode");
+        let bytes = encode(&value).expect("encode");
+        let decoded: Sample = decode(&bytes).expect("decode");
         assert_eq!(decoded, value);
 
         // deterministic: re-encoding the same value yields identical bytes
-        let bytes2 = to_cbor(&decoded).expect("re-encode");
+        let bytes2 = encode(&decoded).expect("re-encode");
         assert_eq!(bytes, bytes2);
     }
 }
