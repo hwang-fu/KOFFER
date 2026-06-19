@@ -272,3 +272,24 @@ mod tests {
         assert!(decoded.is_err());
     }
 }
+
+#[cfg(all(test, feature = "alloc"))]
+mod proptests {
+    use super::*;
+    use crate::codec;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn ascii_string_round_trips(bytes in proptest::collection::vec(0x20u8..=0x7e, 0..=64usize)) {
+            // Every byte is printable ASCII, so construction always succeeds.
+            let text = String::from_utf8(bytes).unwrap();
+            let original = AsciiString::try_from(text).unwrap();
+            let encoded = codec::encode(&original).unwrap();
+            let decoded: AsciiString = codec::decode(&encoded).unwrap();
+            let reencoded = codec::encode(&decoded).unwrap();
+            prop_assert_eq!(decoded, original);
+            prop_assert_eq!(reencoded, encoded);
+        }
+    }
+}
