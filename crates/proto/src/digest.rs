@@ -23,3 +23,9 @@ impl<const N: usize> Digest<N> {
         &self.0
     }
 }
+
+impl<const N: usize> From<[u8; N]> for Digest<N> {
+    fn from(bytes: [u8; N]) -> Self {
+        Digest::<N>::new(bytes)
+    }
+}
