@@ -1,6 +1,8 @@
 //! CBOR codec for koffer-proto: a thin, backend-agnostic layer over the CBOR backend.
 
-pub use minicbor::{Decode, Encode};
+pub use minicbor::decode::Error as DecodeError;
+pub use minicbor::encode::{Error as EncodeError, Write};
+pub use minicbor::{Decode, Decoder, Encode, Encoder};
 
 /// Encode a value to a CBOR byte vector. Requires the `alloc` feature.
 #[cfg(feature = "alloc")]
