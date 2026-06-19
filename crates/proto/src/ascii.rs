@@ -42,3 +42,22 @@ impl AsRef<str> for AsciiStr<'_> {
         self.0
     }
 }
+
+impl<'a> TryFrom<&'a str> for AsciiStr<'a> {
+    type Error = AsciiError;
+
+    fn try_from(s: &'a str) -> Result<Self, AsciiError> {
+        validate(s.as_bytes())?;
+        Ok(Self(s))
+    }
+}
+
+impl<'a> TryFrom<&'a [u8]> for AsciiStr<'a> {
+    type Error = AsciiError;
+
+    fn try_from(bytes: &'a [u8]) -> Result<Self, AsciiError> {
+        // Reject invalid UTF-8 first; printable ASCII is a subset, so no valid input is lost.
+        let s = core::str::from_utf8(bytes).map_err(|_| AsciiError)?;
+        Self::try_from(s)
+    }
+}
