@@ -61,3 +61,9 @@ impl<const MAX: usize> Deref for BoundedBytes<MAX> {
         self.0.as_slice()
     }
 }
+
+impl<const MAX: usize> AsRef<[u8]> for BoundedBytes<MAX> {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_slice()
+    }
+}
