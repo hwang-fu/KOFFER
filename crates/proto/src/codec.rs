@@ -12,3 +12,11 @@ where
 {
     minicbor::to_vec(value)
 }
+
+/// Decode a value from CBOR bytes.
+pub fn from_cbor<'b, T>(bytes: &'b [u8]) -> Result<T, minicbor::decode::Error>
+where
+    T: Decode<'b, ()>,
+{
+    minicbor::decode(bytes)
+}
