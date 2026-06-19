@@ -77,3 +77,22 @@ mod tests {
         }
     }
 }
+
+#[cfg(all(test, feature = "alloc"))]
+mod proptests {
+    use super::*;
+    use crate::codec;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn alg_id_round_trips(raw in any::<i64>()) {
+            let original = AlgId::new(raw);
+            let encoded = codec::encode(&original).unwrap();
+            let decoded: AlgId = codec::decode(&encoded).unwrap();
+            let reencoded = codec::encode(&decoded).unwrap();
+            prop_assert_eq!(decoded, original);
+            prop_assert_eq!(reencoded, encoded);
+        }
+    }
+}
