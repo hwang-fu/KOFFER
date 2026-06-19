@@ -12,3 +12,4 @@ pub mod ascii;
 pub mod bytes;
 pub mod codec;
 pub mod digest;
+pub mod error;
