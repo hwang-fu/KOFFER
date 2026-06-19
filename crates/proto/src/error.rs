@@ -1,5 +1,7 @@
 //! Protocol error codes.
 
+use crate::codec::{Decode, DecodeError, Decoder, Encode, EncodeError, Encoder, Write};
+
 /// A protocol or parse error code, carried in the wire `Error` reply.
 ///
 /// Each named variant has a stable codepoint. A code we don't recognize decodes to
@@ -39,5 +41,32 @@ impl ErrorCode {
             ErrorCode::Internal => 7,
             ErrorCode::Unknown(code) => code,
         }
+    }
+}
+
+impl From<u32> for ErrorCode {
+    fn from(code: u32) -> Self {
+        match code {
+            1 => ErrorCode::Malformed,
+            2 => ErrorCode::UnsupportedAlgorithm,
+            3 => ErrorCode::UnknownRequest,
+            4 => ErrorCode::NotReady,
+            5 => ErrorCode::ConsentDenied,
+            6 => ErrorCode::VerificationFailed,
+            7 => ErrorCode::Internal,
+            other => ErrorCode::Unknown(other),
+        }
+    }
+}
+
+impl<C> Encode<C> for ErrorCode {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), EncodeError<W::Error>> {
+        e.u32(self.codepoint())?.ok()
+    }
+}
+
+impl<'b, C> Decode<'b, C> for ErrorCode {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, DecodeError> {
+        Ok(Self::from(d.u32()?))
     }
 }
