@@ -101,3 +101,23 @@ impl AsRef<str> for AsciiString {
         self.0.as_str()
     }
 }
+
+#[cfg(feature = "alloc")]
+impl TryFrom<&str> for AsciiString {
+    type Error = AsciiError;
+
+    fn try_from(s: &str) -> Result<Self, AsciiError> {
+        validate(s.as_bytes())?;
+        Ok(Self(alloc::string::String::from(s)))
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl TryFrom<alloc::string::String> for AsciiString {
+    type Error = AsciiError;
+
+    fn try_from(s: alloc::string::String) -> Result<Self, AsciiError> {
+        validate(s.as_bytes())?;
+        Ok(Self(s))
+    }
+}
