@@ -153,3 +153,20 @@ impl fmt::Display for AsciiString {
         f.write_str(self.0.as_str())
     }
 }
+
+#[cfg(feature = "alloc")]
+impl<C> Encode<C> for AsciiString {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), EncodeError<W::Error>> {
+        e.str(self.0.as_str())?.ok()
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<'b, C> Decode<'b, C> for AsciiString {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, DecodeError> {
+        let s = d.str()?;
+        validate(s.as_bytes())
+            .map_err(|_| DecodeError::message("input is not printable 7-bit US-ASCII"))?;
+        Ok(Self(alloc::string::String::from(s)))
+    }
+}
