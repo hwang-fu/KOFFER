@@ -4,7 +4,7 @@
 //! (0x20-0x7E). Bytes outside that range are rejected at the parse boundary, never silently
 //! transcoded.
 
-use core::{fmt, ops::Deref};
+use core::fmt;
 
 /// Error returned when input contains a byte outside printable 7-bit US-ASCII (0x20-0x7E).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -24,5 +24,15 @@ fn validate(bytes: &[u8]) -> Result<(), AsciiError> {
         Ok(())
     } else {
         Err(AsciiError)
+    }
+}
+
+/// A borrowed string validated to contain only printable 7-bit US-ASCII.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct AsciiStr<'a>(&'a str);
+
+impl<'a> AsciiStr<'a> {
+    pub fn as_str(&self) -> &str {
+        self.0
     }
 }
