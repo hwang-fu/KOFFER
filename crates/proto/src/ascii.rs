@@ -175,3 +175,100 @@ impl<'b, C> Decode<'b, C> for AsciiString {
         Ok(Self(String::from(s)))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::codec;
+
+    #[test]
+    fn accepts_every_printable_byte() {
+        for b in PRINTABLE_ASCII {
+            assert!(
+                AsciiStr::try_from([b].as_slice()).is_ok(),
+                "0x{b:02X} should be accepted"
+            );
+        }
+    }
+
+    #[test]
+    fn accepts_printable_string_and_preserves_content() {
+        let s = AsciiStr::try_from("Hello, KOFFER! ~").unwrap();
+        assert_eq!(s.as_str(), "Hello, KOFFER! ~");
+    }
+
+    #[test]
+    fn rejects_c0_control_bytes() {
+        for b in 0..*PRINTABLE_ASCII.start() {
+            assert_eq!(
+                AsciiStr::try_from([b].as_slice()),
+                Err(AsciiError),
+                "control 0x{b:02X} should be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_just_outside_the_range() {
+        let below = *PRINTABLE_ASCII.start() - 1; // 0x1F
+        let above = *PRINTABLE_ASCII.end() + 1; // 0x7F (DEL)
+        assert!(AsciiStr::try_from([below].as_slice()).is_err());
+        assert!(AsciiStr::try_from([above].as_slice()).is_err());
+    }
+
+    #[test]
+    fn rejects_non_ascii_utf8_text() {
+        // Valid UTF-8, but 'é' is two bytes both above 0x7E.
+        assert!(AsciiStr::try_from("café").is_err());
+    }
+
+    #[test]
+    fn rejects_invalid_utf8_bytes() {
+        // 0x80 is a stray UTF-8 continuation byte, rejected before the range check.
+        assert!(AsciiStr::try_from([0x80u8].as_slice()).is_err());
+    }
+
+    #[test]
+    fn asciistr_decodes_from_cbor_without_alloc() {
+        // CBOR text string of length 3: 0x63 = major type 3 | length 3, then "abc".
+        let bytes = [0x63, b'a', b'b', b'c'];
+        let s: AsciiStr = codec::decode(&bytes).expect("decode");
+        assert_eq!(s.as_str(), "abc");
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn asciistring_validates_on_construction() {
+        assert!(AsciiString::try_from("plain ascii").is_ok());
+        assert!(AsciiString::try_from("café").is_err());
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn asciistr_cbor_round_trip() {
+        let original = AsciiStr::try_from("firmware-slot-0").unwrap();
+        let bytes = codec::encode(&original).expect("encode");
+        let decoded: AsciiStr = codec::decode(&bytes).expect("decode");
+        assert_eq!(decoded, original);
+        // Deterministic: re-encoding yields identical bytes.
+        assert_eq!(codec::encode(&decoded).expect("re-encode"), bytes);
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn asciistring_cbor_round_trip() {
+        let original = AsciiString::try_from("firmware-slot-0").unwrap();
+        let bytes = codec::encode(&original).expect("encode");
+        let decoded: AsciiString = codec::decode(&bytes).expect("decode");
+        assert_eq!(decoded, original);
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn cbor_decode_rejects_non_ascii_on_the_wire() {
+        // A valid CBOR text string whose content is not printable ASCII.
+        let wire = codec::encode(&"café").expect("encode");
+        let decoded: Result<AsciiStr, _> = codec::decode(&wire);
+        assert!(decoded.is_err());
+    }
+}
