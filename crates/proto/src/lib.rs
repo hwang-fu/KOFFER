@@ -7,11 +7,12 @@
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
+pub mod alg;
+pub mod ascii;
+pub mod bytes;
+pub mod codec;
+pub mod digest;
+pub mod error;
+
 #[cfg(test)]
-mod tests {
-    #[test]
-    fn smoke() {
-        let sum = 2 + 2;
-        assert_eq!(sum, 4);
-    }
-}
+mod testutil;
