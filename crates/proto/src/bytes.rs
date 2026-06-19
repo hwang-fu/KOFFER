@@ -149,3 +149,22 @@ mod tests {
         assert_eq!(codec::encode(&decoded).expect("re-encode"), bytes);
     }
 }
+
+#[cfg(all(test, feature = "alloc"))]
+mod proptests {
+    use super::*;
+    use crate::codec;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn bounded_bytes_round_trips(bytes in proptest::collection::vec(any::<u8>(), 0..=32usize)) {
+            let original = BoundedBytes::<32>::try_from(bytes.as_slice()).unwrap();
+            let encoded = codec::encode(&original).unwrap();
+            let decoded: BoundedBytes<32> = codec::decode(&encoded).unwrap();
+            let reencoded = codec::encode(&decoded).unwrap();
+            prop_assert_eq!(decoded, original);
+            prop_assert_eq!(reencoded, encoded);
+        }
+    }
+}
