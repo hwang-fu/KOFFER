@@ -5,6 +5,8 @@
 //! transcoded.
 
 use crate::codec::{Decode, DecodeError, Decoder, Encode, EncodeError, Encoder, Write};
+#[cfg(feature = "alloc")]
+use alloc::string::String;
 use core::fmt;
 use core::ops::Deref;
 
@@ -96,7 +98,7 @@ impl<'b, C> Decode<'b, C> for AsciiStr<'b> {
 /// An owned string validated to contain only printable 7-bit US-ASCII.
 #[cfg(feature = "alloc")]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct AsciiString(alloc::string::String);
+pub struct AsciiString(String);
 
 #[cfg(feature = "alloc")]
 impl AsciiString {
@@ -124,15 +126,15 @@ impl TryFrom<&str> for AsciiString {
 
     fn try_from(s: &str) -> Result<Self, AsciiError> {
         validate(s.as_bytes())?;
-        Ok(Self(alloc::string::String::from(s)))
+        Ok(Self(String::from(s)))
     }
 }
 
 #[cfg(feature = "alloc")]
-impl TryFrom<alloc::string::String> for AsciiString {
+impl TryFrom<String> for AsciiString {
     type Error = AsciiError;
 
-    fn try_from(s: alloc::string::String) -> Result<Self, AsciiError> {
+    fn try_from(s: String) -> Result<Self, AsciiError> {
         validate(s.as_bytes())?;
         Ok(Self(s))
     }
@@ -167,6 +169,6 @@ impl<'b, C> Decode<'b, C> for AsciiString {
         let s = d.str()?;
         validate(s.as_bytes())
             .map_err(|_| DecodeError::message("input is not printable 7-bit US-ASCII"))?;
-        Ok(Self(alloc::string::String::from(s)))
+        Ok(Self(String::from(s)))
     }
 }
