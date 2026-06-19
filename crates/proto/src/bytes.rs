@@ -1,5 +1,6 @@
 //! Length-bounded byte buffers.
 
+use crate::codec::{Decode, DecodeError, Decoder, Encode, EncodeError, Encoder, Write};
 use core::fmt;
 use core::ops::Deref;
 
@@ -65,5 +66,19 @@ impl<const MAX: usize> Deref for BoundedBytes<MAX> {
 impl<const MAX: usize> AsRef<[u8]> for BoundedBytes<MAX> {
     fn as_ref(&self) -> &[u8] {
         self.0.as_slice()
+    }
+}
+
+impl<C, const MAX: usize> Encode<C> for BoundedBytes<MAX> {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), EncodeError<W::Error>> {
+        e.bytes(self.as_slice())?.ok()
+    }
+}
+
+impl<'b, C, const MAX: usize> Decode<'b, C> for BoundedBytes<MAX> {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, DecodeError> {
+        let bytes = d.bytes()?;
+        Self::try_from(bytes)
+            .map_err(|_| DecodeError::message("byte sequence exceeds the maximum length"))
     }
 }
