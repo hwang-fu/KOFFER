@@ -36,3 +36,44 @@ impl<'b, C> Decode<'b, C> for AlgId {
         Ok(Self::new(d.i64()?))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::codec;
+
+    #[test]
+    fn from_and_get_round_trip() {
+        assert_eq!(AlgId::from(-46).get(), -46);
+        assert_eq!(AlgId::new(7).get(), 7);
+    }
+
+    #[test]
+    fn decodes_bare_integer_without_alloc() {
+        // CBOR unsigned integer 1 is a single byte: 0x01.
+        let wire = [0x01];
+        let id: AlgId = codec::decode(&wire).expect("decode");
+        assert_eq!(id, AlgId::new(1));
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn encodes_as_bare_integer() {
+        // A bare CBOR integer, not wrapped in an array.
+        // A derived struct encode would instead prefix 0x81 (array of 1).
+        assert_eq!(codec::encode(&AlgId::new(1)).expect("encode"), [0x01]);
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn round_trip_negative_and_positive() {
+        for raw in [-46, -1, 0, 1, 1000] {
+            let original = AlgId::new(raw);
+            let bytes = codec::encode(&original).expect("encode");
+            let decoded: AlgId = codec::decode(&bytes).expect("decode");
+            assert_eq!(decoded, original);
+            // Deterministic: re-encoding yields identical bytes.
+            assert_eq!(codec::encode(&decoded).expect("re-encode"), bytes);
+        }
+    }
+}
