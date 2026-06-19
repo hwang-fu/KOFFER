@@ -22,9 +22,12 @@ impl fmt::Display for AsciiError {
 
 impl core::error::Error for AsciiError {}
 
+/// Inclusive range of printable 7-bit US-ASCII (space `0x20` through `~` `0x7E`).
+const PRINTABLE_ASCII: core::ops::RangeInclusive<u8> = 0x20..=0x7E;
+
 /// `Ok` only if every byte is printable 7-bit US-ASCII (0x20-0x7E).
 fn validate(bytes: &[u8]) -> Result<(), AsciiError> {
-    if bytes.iter().all(|b| (0x20u8..=0x7E).contains(b)) {
+    if bytes.iter().all(|b| PRINTABLE_ASCII.contains(b)) {
         Ok(())
     } else {
         Err(AsciiError)
