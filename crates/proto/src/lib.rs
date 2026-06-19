@@ -8,5 +8,6 @@
 extern crate alloc;
 
 pub mod ascii;
+pub mod bytes;
 pub mod codec;
 pub mod digest;
