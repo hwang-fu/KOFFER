@@ -11,3 +11,15 @@ pub struct Digest<const N: usize>([u8; N]);
 pub type Digest256 = Digest<32>;
 /// SHA-512 digest (64 bytes).
 pub type Digest512 = Digest<64>;
+
+impl<const N: usize> Digest<N> {
+    /// Wrap raw digest bytes.
+    pub const fn new(bytes: [u8; N]) -> Self {
+        Self(bytes)
+    }
+
+    /// The digest bytes.
+    pub const fn as_bytes(&self) -> &[u8; N] {
+        &self.0
+    }
+}
