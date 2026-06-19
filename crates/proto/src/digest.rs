@@ -94,3 +94,22 @@ mod tests {
         assert_eq!(codec::encode(&decoded).expect("re-encode"), bytes);
     }
 }
+
+#[cfg(all(test, feature = "alloc"))]
+mod proptests {
+    use super::*;
+    use crate::codec;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn digest_round_trips(bytes in any::<[u8; 32]>()) {
+            let original = Digest::<32>::new(bytes);
+            let encoded = codec::encode(&original).unwrap();
+            let decoded: Digest<32> = codec::decode(&encoded).unwrap();
+            let reencoded = codec::encode(&decoded).unwrap();
+            prop_assert_eq!(decoded, original);
+            prop_assert_eq!(reencoded, encoded);
+        }
+    }
+}
