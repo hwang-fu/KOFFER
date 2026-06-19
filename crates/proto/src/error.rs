@@ -141,3 +141,22 @@ mod tests {
         }
     }
 }
+
+#[cfg(all(test, feature = "alloc"))]
+mod proptests {
+    use super::*;
+    use crate::codec;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn error_code_round_trips(code in any::<u32>()) {
+            let original = ErrorCode::from(code);
+            let encoded = codec::encode(&original).unwrap();
+            let decoded: ErrorCode = codec::decode(&encoded).unwrap();
+            let reencoded = codec::encode(&decoded).unwrap();
+            prop_assert_eq!(decoded, original);
+            prop_assert_eq!(reencoded, encoded);
+        }
+    }
+}
