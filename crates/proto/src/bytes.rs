@@ -22,3 +22,20 @@ impl fmt::Display for TooLong {
 }
 
 impl core::error::Error for TooLong {}
+
+/// A variable-length byte buffer holding at most `MAX` bytes.
+///
+/// Backed by a fixed-capacity inline buffer (no heap). Encoded on the wire as a
+/// CBOR byte string; decoding rejects any byte string longer than `MAX`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+pub struct BoundedBytes<const MAX: usize>(heapless::Vec<u8, MAX>);
+
+impl<const MAX: usize> BoundedBytes<MAX> {
+    pub const fn new() -> Self {
+        BoundedBytes(heapless::Vec::new())
+    }
+
+    pub fn as_slice(&self) -> &[u8] {
+        self.0.as_slice()
+    }
+}
