@@ -5,6 +5,7 @@
 //! transcoded.
 
 use core::fmt;
+use core::ops::Deref;
 
 /// Error returned when input contains a byte outside printable 7-bit US-ASCII (0x20-0x7E).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -59,5 +60,13 @@ impl<'a> TryFrom<&'a [u8]> for AsciiStr<'a> {
         // Reject invalid UTF-8 first; printable ASCII is a subset, so no valid input is lost.
         let s = core::str::from_utf8(bytes).map_err(|_| AsciiError)?;
         Self::try_from(s)
+    }
+}
+
+impl Deref for AsciiStr<'_> {
+    type Target = str;
+
+    fn deref(&self) -> &str {
+        self.0
     }
 }
