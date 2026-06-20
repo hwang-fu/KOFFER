@@ -29,3 +29,27 @@ pub(crate) enum KatError {
     /// A record was missing a field the test asked for.
     MissingField(String),
 }
+
+/// Decodes a hex string to bytes; errors on an odd length or a non-hex digit.
+fn decode_hex(s: &str) -> Result<Vec<u8>, KatError> {
+    fn nibble(c: u8) -> Option<u8> {
+        match c {
+            b'0'..=b'9' => Some(c - b'0'),
+            b'a'..=b'f' => Some(c - b'a' + 10),
+            b'A'..=b'F' => Some(c - b'A' + 10),
+            _ => None,
+        }
+    }
+
+    let bytes = s.as_bytes();
+    if bytes.len() % 2 != 0 {
+        return Err(KatError::BadHex(s.to_string()));
+    }
+    let mut out = Vec::with_capacity(bytes.len() / 2);
+    for pair in bytes.chunks_exact(2) {
+        let hi = nibble(pair[0]).ok_or_else(|| KatError::BadHex(s.to_string()))?;
+        let lo = nibble(pair[1]).ok_or_else(|| KatError::BadHex(s.to_string()))?;
+        out.push((hi << 4) | lo);
+    }
+    Ok(out)
+}
