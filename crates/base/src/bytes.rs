@@ -1,7 +1,9 @@
 //! Length-bounded byte buffers.
 
 use core::fmt;
+use core::hash::{Hash, Hasher};
 use core::ops::Deref;
+use subtle::ConstantTimeEq;
 
 /// Error returned when a byte sequence is longer than the buffer's maximum length `MAX`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,7 +30,9 @@ impl core::error::Error for TooLong {}
 ///
 /// Backed by a fixed-capacity inline buffer (no heap), so it carries its worst-case
 /// size and never allocates. Construction rejects any sequence longer than `MAX`.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+/// Equality is **constant-time** (see the `ConstantTimeEq` / `PartialEq` impls below),
+/// so comparing secret material never leaks through timing.
+#[derive(Debug, Clone, Default)]
 pub struct Bytes<const MAX: usize>(heapless::Vec<u8, MAX>);
 
 impl<const MAX: usize> Bytes<MAX> {
@@ -67,6 +71,27 @@ impl<const MAX: usize> Deref for Bytes<MAX> {
 
     fn deref(&self) -> &[u8] {
         self.0.as_slice()
+    }
+}
+
+impl<const MAX: usize> PartialEq for Bytes<MAX> {
+    fn eq(&self, other: &Self) -> bool {
+        self.ct_eq(other).into()
+    }
+}
+
+impl<const MAX: usize> Eq for Bytes<MAX> {}
+
+impl<const MAX: usize> Hash for Bytes<MAX> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.as_slice().hash(state);
+    }
+}
+
+impl<const MAX: usize> ConstantTimeEq for Bytes<MAX> {
+    fn ct_eq(&self, other: &Self) -> subtle::Choice {
+        // Length is public; equal-length contents are compared with no early exit.
+        self.0.as_slice().ct_eq(other.0.as_slice())
     }
 }
 
