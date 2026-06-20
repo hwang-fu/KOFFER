@@ -8,3 +8,5 @@
 extern crate alloc;
 
 pub mod error;
+pub mod kem;
+pub mod sign;
