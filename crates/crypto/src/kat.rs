@@ -30,6 +30,16 @@ pub(crate) enum KatError {
     MissingField(String),
 }
 
+impl std::fmt::Display for KatError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            KatError::MalformedLine(line) => write!(f, "malformed KAT line: {line}"),
+            KatError::BadHex(value) => write!(f, "invalid hex in KAT value: {value}"),
+            KatError::MissingField(name) => write!(f, "KAT record has no field `{name}`"),
+        }
+    }
+}
+
 /// Decodes a hex string to bytes; errors on an odd length or a non-hex digit.
 fn decode_hex(s: &str) -> Result<Vec<u8>, KatError> {
     fn nibble(c: u8) -> Option<u8> {
