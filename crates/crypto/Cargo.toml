@@ -9,3 +9,8 @@ repository.workspace = true
 default = []
 std = ["alloc"]
 alloc = []
+
+[dependencies]
+base = { package = "koffer-base", path = "../base" }
+rand_core = { version = "0.6.4", default-features = false }
+zeroize = { version = "1.9.0", default-features = false }

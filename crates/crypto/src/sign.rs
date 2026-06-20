@@ -1,0 +1,50 @@
+//! Signing-side value types: keys and signatures.
+
+use crate::error::{SignError, VerifyError};
+
+// Buffer capacities, each the largest over the supported signature algorithms.
+// ML-DSA-87 is the largest for the key sizes; the HSS/LMS keys are much smaller.
+const SIGNING_KEY_MAX: usize = 4896; // ML-DSA-87 secret key
+const VERIFYING_KEY_MAX: usize = 2592; // ML-DSA-87 public key
+// Provisional: presently ML-DSA-87's signature length. The HSS/LMS signature size
+// depends on parameters not yet chosen and may exceed this; raise it once those
+// parameters are fixed.
+const SIGNATURE_MAX: usize = 4627; // ML-DSA-87 signature
+
+secret_byte_value! {
+    /// A secret signing key, as raw bytes.
+    SigningKey, SIGNING_KEY_MAX
+}
+
+byte_value! {
+    /// A public verifying key, as raw bytes.
+    VerifyingKey, VERIFYING_KEY_MAX
+}
+
+byte_value! {
+    /// A signature, as raw bytes.
+    Signature, SIGNATURE_MAX
+}
+
+/// A signing backend: produces a signature over a message with a secret key.
+///
+/// Each signing scheme implements `Signer`; the right one is selected by algorithm
+/// at the call site.
+pub trait Signer {
+    /// Signs `message` with `key`.
+    fn sign(&self, key: &SigningKey, message: &[u8]) -> Result<Signature, SignError>;
+}
+
+/// A verifying backend: checks a signature against a verifying key and message.
+pub trait Verifier {
+    /// Checks `signature` over `message` against `key`.
+    ///
+    /// `Ok(())` means valid; `Err(VerifyError::VerificationFailed)` means the signature
+    /// is well-formed but does not match.
+    fn verify(
+        &self,
+        key: &VerifyingKey,
+        message: &[u8],
+        signature: &Signature,
+    ) -> Result<(), VerifyError>;
+}

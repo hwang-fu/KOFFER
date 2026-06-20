@@ -4,6 +4,7 @@ use core::fmt;
 use core::hash::{Hash, Hasher};
 use core::ops::Deref;
 use subtle::ConstantTimeEq;
+use zeroize::Zeroize;
 
 /// Error returned when a byte sequence is longer than the buffer's maximum length `MAX`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -95,6 +96,14 @@ impl<const MAX: usize> ConstantTimeEq for Bytes<MAX> {
     }
 }
 
+impl<const MAX: usize> Zeroize for Bytes<MAX> {
+    fn zeroize(&mut self) {
+        // Overwrite the live bytes in place. `zeroize` uses volatile writes, so the
+        // compiler cannot optimize the wipe away; the length is left unchanged.
+        self.0.as_mut_slice().zeroize();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -141,5 +150,12 @@ mod tests {
         // The constant-time primitive agrees.
         assert!(bool::from(a.ct_eq(&b)));
         assert!(!bool::from(a.ct_eq(&c)));
+    }
+
+    #[test]
+    fn zeroize_overwrites_the_bytes() {
+        let mut b = Bytes::<8>::try_from(&[1, 2, 3, 4][..]).unwrap();
+        b.zeroize();
+        assert_eq!(b.as_slice(), &[0, 0, 0, 0]);
     }
 }
