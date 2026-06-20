@@ -69,3 +69,34 @@ impl<const MAX: usize> Deref for Bytes<MAX> {
         self.0.as_slice()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn accepts_up_to_max() {
+        let bytes = [0u8; 4];
+        for len in 0..=4 {
+            let r = Bytes::<4>::try_from(&bytes[..len]);
+            assert!(r.is_ok(), "len {len} should be accepted");
+            assert_eq!(r.unwrap().as_slice(), &bytes[..len]);
+        }
+    }
+
+    #[test]
+    fn rejects_over_max() {
+        let bytes = [0u8; 5];
+        let r = Bytes::<4>::try_from(&bytes[..]);
+        assert_eq!(r, Err(TooLong { len: 5, max: 4 }));
+    }
+
+    #[test]
+    fn behaves_like_a_byte_slice() {
+        let b = Bytes::<4>::try_from(&[1u8, 2, 3][..]).unwrap();
+        assert_eq!(b.len(), 3); // Deref -> slice::len
+        assert!(!b.is_empty()); // Deref -> slice::is_empty
+        assert_eq!(b[1], 2); // Deref -> slice indexing
+        assert_eq!(b.first(), Some(&1)); // Deref -> slice::first
+    }
+}
