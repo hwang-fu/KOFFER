@@ -95,6 +95,9 @@ pub mod sign;
 mod kat;
 
 #[cfg(test)]
+mod mock;
+
+#[cfg(test)]
 mod tests {
     const TEST_MAX: usize = 4;
 
