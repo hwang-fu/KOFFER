@@ -1,6 +1,7 @@
 //! Length-bounded byte buffers.
 
 use core::fmt;
+use core::ops::Deref;
 
 /// Error returned when a byte sequence is longer than the buffer's maximum length `MAX`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,6 +58,14 @@ impl<const MAX: usize> TryFrom<&[u8]> for Bytes<MAX> {
 
 impl<const MAX: usize> AsRef<[u8]> for Bytes<MAX> {
     fn as_ref(&self) -> &[u8] {
+        self.0.as_slice()
+    }
+}
+
+impl<const MAX: usize> Deref for Bytes<MAX> {
+    type Target = [u8];
+
+    fn deref(&self) -> &[u8] {
         self.0.as_slice()
     }
 }
