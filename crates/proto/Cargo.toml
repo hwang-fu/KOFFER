@@ -12,7 +12,13 @@ alloc = ["minicbor/alloc"]
 
 [dependencies]
 heapless = { version = "0.9.3", default-features = false }
-minicbor = { version = "2.2.2", default-features = false, features = ["derive"] }
+minicbor = { version = "2.2.2", default-features = false, features = [
+    "derive",
+] }
 
 [dev-dependencies]
-proptest = { version = "1.11.0", default-features = false, features = ["std", "bit-set", "regex-syntax"] }
+proptest = { version = "1.11.0", default-features = false, features = [
+    "std",
+    "bit-set",
+    "regex-syntax",
+] }
