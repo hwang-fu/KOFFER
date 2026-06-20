@@ -112,4 +112,16 @@ mod tests {
         let over = [0u8; TEST_MAX + 1];
         assert!(TestValue::try_from(&over[..]).is_err());
     }
+
+    secret_byte_value! {
+        /// Throwaway secret type, defined only to exercise the `secret_byte_value!`
+        /// macro that the real secret value types are generated from.
+        SecretTestValue, TEST_MAX
+    }
+
+    #[test]
+    fn secret_debug_is_redacted() {
+        let v = SecretTestValue::try_from(&[1, 2, 3][..]).unwrap();
+        assert_eq!(format!("{v:?}"), "SecretTestValue { .. }");
+    }
 }
