@@ -125,6 +125,7 @@ mod tests {
     #[test]
     fn secret_debug_is_redacted() {
         let v = SecretTestValue::try_from(&[1, 2, 3][..]).unwrap();
+        assert_eq!(v.as_slice(), &[1, 2, 3]);
         assert_eq!(format!("{v:?}"), "SecretTestValue { .. }");
     }
 }
