@@ -10,3 +10,4 @@ default = []
 
 [dependencies]
 heapless = { version = "0.9.3", default-features = false }
+subtle = { version = "2.6.1", default-features = false }
