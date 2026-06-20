@@ -1,5 +1,7 @@
 //! Key-exchange (KEM) value types: keys, ciphertext, and shared secret.
 
+use crate::error::KemError;
+
 // Provisional capacities -- the hybrid figures add X25519's 32 bytes to the
 // ML-KEM-1024 sizes. Placeholders pending the full set of supported algorithms.
 const ENCAPSULATION_KEY_MAX: usize = 1600; // X25519 (32) + ML-KEM-1024 ek (1568)
@@ -25,4 +27,26 @@ byte_value! {
 byte_value! {
     /// A derived shared secret, as raw bytes.
     SharedSecret, SHARED_SECRET_MAX
+}
+
+/// A key-encapsulation backend: agree a shared secret using a peer's public key.
+///
+/// `encapsulate` draws randomness from the supplied source -- on the device, the
+/// firmware's TRNG-backed entropy; in tests, a seeded deterministic RNG.
+/// `decapsulate` is deterministic.
+pub trait Kem {
+    /// Generates a fresh shared secret for `key`, returned with the ciphertext that
+    /// lets the holder of the matching decapsulation key recover it.
+    fn encapsulate(
+        &self,
+        key: &EncapsulationKey,
+        rng: &mut dyn rand_core::CryptoRngCore,
+    ) -> Result<(Ciphertext, SharedSecret), KemError>;
+
+    /// Recovers the shared secret from `ciphertext` using `key`.
+    fn decapsulate(
+        &self,
+        key: &DecapsulationKey,
+        ciphertext: &Ciphertext,
+    ) -> Result<SharedSecret, KemError>;
 }
