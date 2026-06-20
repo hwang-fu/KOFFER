@@ -83,3 +83,12 @@ pub(crate) fn parse(input: &str) -> Result<Vec<KatRecord>, KatError> {
     }
     Ok(records)
 }
+
+/// Asserts that `actual` matches the record's `name` field, panicking with a
+/// message naming the field on mismatch or if the field is absent. For KAT tests.
+pub(crate) fn assert_field(record: &KatRecord, name: &str, actual: &[u8]) {
+    let expected = record
+        .field(name)
+        .unwrap_or_else(|e| panic!("KAT field `{name}`: {e:?}"));
+    assert_eq!(actual, expected, "KAT field `{name}` does not match");
+}
