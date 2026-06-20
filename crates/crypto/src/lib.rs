@@ -36,6 +36,7 @@ macro_rules! byte_value {
 pub mod alg;
 pub mod error;
 pub mod kem;
+pub mod profile;
 pub mod sign;
 
 #[cfg(test)]
