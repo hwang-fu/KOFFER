@@ -84,3 +84,54 @@ impl KemAlg {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const SIG_ALGS: [SigAlg; 3] = [SigAlg::HssLmsSha256, SigAlg::MlDsa65, SigAlg::MlDsa87];
+    const KEM_ALGS: [KemAlg; 4] = [
+        KemAlg::MlKem768,
+        KemAlg::MlKem1024,
+        KemAlg::X25519MlKem768,
+        KemAlg::X25519MlKem1024,
+    ];
+
+    #[test]
+    fn sig_alg_codepoints_round_trip() {
+        for alg in SIG_ALGS {
+            assert_eq!(SigAlg::from_cose_id(alg.cose_id()), Some(alg));
+        }
+    }
+
+    #[test]
+    fn kem_alg_codepoints_round_trip() {
+        for alg in KEM_ALGS {
+            assert_eq!(KemAlg::from_cose_id(alg.cose_id()), Some(alg));
+        }
+    }
+
+    #[test]
+    fn unknown_codepoint_is_none() {
+        assert_eq!(SigAlg::from_cose_id(0), None);
+        assert_eq!(KemAlg::from_cose_id(0), None);
+    }
+
+    #[test]
+    fn all_codepoints_are_distinct() {
+        let ids = [
+            SigAlg::HssLmsSha256.cose_id(),
+            SigAlg::MlDsa65.cose_id(),
+            SigAlg::MlDsa87.cose_id(),
+            KemAlg::MlKem768.cose_id(),
+            KemAlg::MlKem1024.cose_id(),
+            KemAlg::X25519MlKem768.cose_id(),
+            KemAlg::X25519MlKem1024.cose_id(),
+        ];
+        for (i, a) in ids.iter().enumerate() {
+            for b in &ids[i + 1..] {
+                assert_ne!(a, b);
+            }
+        }
+    }
+}
