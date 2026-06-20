@@ -92,6 +92,9 @@ pub mod profile;
 pub mod sign;
 
 #[cfg(test)]
+mod kat;
+
+#[cfg(test)]
 mod tests {
     const TEST_MAX: usize = 4;
 
