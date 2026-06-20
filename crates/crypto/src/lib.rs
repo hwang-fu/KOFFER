@@ -1,6 +1,19 @@
 //! Post-quantum cryptographic primitives and crypto-agility traits for KOFFER.
 //!
 //! `no_std` by default; enable the `alloc` or `std` feature for heap-backed APIs.
+//!
+//! # Secret hygiene and constant-time conventions
+//!
+//! - **Secrets compare in constant time.** The secret value types wrap `base::Bytes`,
+//!   whose `PartialEq` routes through `ConstantTimeEq`, so comparing keys or shared
+//!   secrets does not leak their contents through timing.
+//! - **Secrets wipe on drop and redact their `Debug`.** `SigningKey`, `DecapsulationKey`,
+//!   and `SharedSecret` overwrite their bytes when dropped and print only their type
+//!   name, never their contents.
+//! - **Constant-time *operations* are each backend's responsibility.** This crate
+//!   defines the interfaces and value types; keeping the operations themselves
+//!   constant-time -- ML-KEM decapsulation, for instance -- falls to the backend that
+//!   implements these traits, not to this layer.
 
 #![cfg_attr(not(test), no_std)]
 
