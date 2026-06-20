@@ -20,3 +20,19 @@ pub enum SignError {
     /// An unexpected device-side failure, such as the randomness source failing.
     Internal,
 }
+
+/// What can go wrong while verifying a signature.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum VerifyError {
+    /// The signature is well-formed but does not match the key and message. This
+    /// is the ordinary "not a valid signature" answer.
+    VerificationFailed,
+    /// The signature bytes are the wrong length or shape and cannot be read as a
+    /// signature at all.
+    MalformedSignature,
+    /// The supplied public-key bytes are not a valid key.
+    MalformedKey,
+    /// The requested algorithm is not built into this device.
+    UnsupportedAlgorithm,
+}
