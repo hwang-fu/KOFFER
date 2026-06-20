@@ -33,6 +33,7 @@ macro_rules! byte_value {
       };
   }
 
+pub mod alg;
 pub mod error;
 pub mod kem;
 pub mod sign;
