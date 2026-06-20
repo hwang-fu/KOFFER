@@ -5,6 +5,7 @@
 use crate::error::{KemError, SignError, VerifyError};
 use crate::kem::{Ciphertext, DecapsulationKey, EncapsulationKey, Kem, SharedSecret};
 use crate::sign::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
+use rand_core::{CryptoRng, RngCore};
 
 /// A stand-in backend: no real cryptography, just enough for a roundtrip.
 struct Mock;
@@ -54,3 +55,31 @@ impl Kem for Mock {
         SharedSecret::try_from(ciphertext.as_slice()).map_err(|_| KemError::Internal)
     }
 }
+
+/// A deterministic counter RNG -- enough to satisfy `CryptoRngCore` in tests.
+struct CountingRng(u64);
+
+impl RngCore for CountingRng {
+    fn next_u32(&mut self) -> u32 {
+        self.next_u64() as u32
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        self.0 = self.0.wrapping_add(1);
+        self.0
+    }
+
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        for chunk in dest.chunks_mut(8) {
+            let value = self.next_u64().to_le_bytes();
+            chunk.copy_from_slice(&value[..chunk.len()]);
+        }
+    }
+
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
+        self.fill_bytes(dest);
+        Ok(())
+    }
+}
+
+impl CryptoRng for CountingRng {}
