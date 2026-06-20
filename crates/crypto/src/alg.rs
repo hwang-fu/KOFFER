@@ -61,3 +61,26 @@ impl SigAlg {
         }
     }
 }
+
+impl KemAlg {
+    /// The COSE algorithm codepoint that identifies this algorithm on the wire.
+    pub fn cose_id(self) -> i32 {
+        match self {
+            KemAlg::MlKem768 => COSE_ML_KEM_768,
+            KemAlg::MlKem1024 => COSE_ML_KEM_1024,
+            KemAlg::X25519MlKem768 => COSE_X25519_ML_KEM_768,
+            KemAlg::X25519MlKem1024 => COSE_X25519_ML_KEM_1024,
+        }
+    }
+
+    /// The algorithm for a COSE codepoint, or `None` if it is not recognized.
+    pub fn from_cose_id(id: i32) -> Option<Self> {
+        match id {
+            COSE_ML_KEM_768 => Some(KemAlg::MlKem768),
+            COSE_ML_KEM_1024 => Some(KemAlg::MlKem1024),
+            COSE_X25519_ML_KEM_768 => Some(KemAlg::X25519MlKem768),
+            COSE_X25519_ML_KEM_1024 => Some(KemAlg::X25519MlKem1024),
+            _ => None,
+        }
+    }
+}
