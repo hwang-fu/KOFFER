@@ -52,7 +52,7 @@ fn decode_hex(s: &str) -> Result<Vec<u8>, KatError> {
     }
 
     let bytes = s.as_bytes();
-    if bytes.len() % 2 != 0 {
+    if !bytes.len().is_multiple_of(2) {
         return Err(KatError::BadHex(s.to_string()));
     }
     let mut out = Vec::with_capacity(bytes.len() / 2);
