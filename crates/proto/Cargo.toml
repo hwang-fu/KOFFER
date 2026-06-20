@@ -11,7 +11,7 @@ std = ["alloc"]
 alloc = ["minicbor/alloc"]
 
 [dependencies]
-heapless = { version = "0.9.3", default-features = false }
+base = { package = "koffer-base", path = "../base" }
 minicbor = { version = "2.2.2", default-features = false, features = ["derive"] }
 
 [dev-dependencies]
