@@ -4,6 +4,7 @@
 
 use crate::error::{KemError, SignError, VerifyError};
 use crate::kem::{Ciphertext, DecapsulationKey, EncapsulationKey, Kem, SharedSecret};
+use crate::profile::CryptoProfile;
 use crate::sign::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use rand_core::{CryptoRng, RngCore};
 
@@ -83,3 +84,34 @@ impl RngCore for CountingRng {
 }
 
 impl CryptoRng for CountingRng {}
+
+#[test]
+fn seam_composes_end_to_end() {
+    let backend = Mock;
+    let profile = CryptoProfile::Showcase;
+
+    // The flow begins at profile selection. There is no dispatch table yet, so the
+    // mock does not branch on the chosen algorithm -- we just exercise the selector.
+    let _sig_alg = profile.general_sig();
+    let _kem_alg = profile.kem();
+
+    // Sign / verify: the roundtrip accepts; a tampered message is rejected.
+    let signing_key = SigningKey::try_from(&[0u8; 4][..]).unwrap();
+    let verifying_key = VerifyingKey::try_from(&[0u8; 4][..]).unwrap();
+    let message = b"hello koffer";
+    let signature = backend.sign(&signing_key, message).unwrap();
+    backend.verify(&verifying_key, message, &signature).unwrap();
+    assert!(
+        backend
+            .verify(&verifying_key, b"tampered", &signature)
+            .is_err()
+    );
+
+    // Encapsulate / decapsulate: both sides agree on the shared secret.
+    let mut rng = CountingRng(0);
+    let ek = EncapsulationKey::try_from(&[0u8; 4][..]).unwrap();
+    let dk = DecapsulationKey::try_from(&[0u8; 4][..]).unwrap();
+    let (ciphertext, secret) = backend.encapsulate(&ek, &mut rng).unwrap();
+    let recovered = backend.decapsulate(&dk, &ciphertext).unwrap();
+    assert_eq!(secret.as_slice(), recovered.as_slice());
+}
