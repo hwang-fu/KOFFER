@@ -73,6 +73,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "koffer-base"
+version = "0.1.0"
+dependencies = [
+ "heapless",
+]
+
+[[package]]
 name = "koffer-crypto"
 version = "0.1.0"
 
