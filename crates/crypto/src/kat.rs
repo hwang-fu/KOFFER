@@ -53,3 +53,33 @@ fn decode_hex(s: &str) -> Result<Vec<u8>, KatError> {
     }
     Ok(out)
 }
+
+/// Parses the line-based KAT format: one `name = hexvalue` per line, blank lines
+/// separating records, `#` comment lines ignored. Every value is hex.
+pub(crate) fn parse(input: &str) -> Result<Vec<KatRecord>, KatError> {
+    let mut records = Vec::new();
+    let mut current = BTreeMap::new();
+
+    for raw in input.lines() {
+        let line = raw.trim();
+        if line.starts_with('#') {
+            continue;
+        }
+        if line.is_empty() {
+            if !current.is_empty() {
+                records.push(KatRecord {
+                    fields: std::mem::take(&mut current),
+                });
+            }
+            continue;
+        }
+        let (name, value) = line
+            .split_once('=')
+            .ok_or_else(|| KatError::MalformedLine(line.to_string()))?;
+        current.insert(name.trim().to_string(), decode_hex(value.trim())?);
+    }
+    if !current.is_empty() {
+        records.push(KatRecord { fields: current });
+    }
+    Ok(records)
+}
