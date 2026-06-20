@@ -36,3 +36,25 @@ pub enum VerifyError {
     /// The requested algorithm is not built into this device.
     UnsupportedAlgorithm,
 }
+
+/// What can go wrong during key-exchange (encapsulation or decapsulation).
+///
+/// There is deliberately no "decapsulation failed" case: a conforming KEM
+/// returns a deterministic dummy shared secret for an invalid-but-well-formed
+/// ciphertext instead of reporting an error, so the outcome never depends on the
+/// secret key. `MalformedCiphertext` covers only a structurally broken
+/// ciphertext, whose length is public information.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum KemError {
+    /// A supplied key is not valid: the public key when encapsulating, or the
+    /// secret key when decapsulating.
+    MalformedKey,
+    /// The ciphertext is the wrong length or shape and cannot be read.
+    MalformedCiphertext,
+    /// The requested algorithm is not built into this device.
+    UnsupportedAlgorithm,
+    /// An unexpected device-side failure, such as the randomness source failing
+    /// during encapsulation.
+    Internal,
+}
