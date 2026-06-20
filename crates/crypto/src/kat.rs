@@ -92,3 +92,36 @@ pub(crate) fn assert_field(record: &KatRecord, name: &str, actual: &[u8]) {
         .unwrap_or_else(|e| panic!("KAT field `{name}`: {e:?}"));
     assert_eq!(actual, expected, "KAT field `{name}` does not match");
 }
+
+// Trivial fixture proving the harness end to end: `output` is `input` reversed,
+// so a passing check exercises load -> run -> compare with no real crypto.
+const FIXTURE: &str = "\
+# two made-up records
+input = 010203
+output = 030201
+
+input = aabb
+output = bbaa
+";
+
+#[test]
+fn parses_fixture_and_checks_the_operation() {
+    let records = parse(FIXTURE).unwrap();
+    assert_eq!(records.len(), 2);
+    for record in &records {
+        let input = record.field("input").unwrap();
+        let reversed: Vec<u8> = input.iter().rev().copied().collect();
+        assert_field(record, "output", &reversed);
+    }
+}
+
+#[test]
+fn rejects_bad_hex() {
+    assert!(parse("k = 0g").is_err());
+}
+
+#[test]
+fn missing_field_is_an_error() {
+    let records = parse("k = 00").unwrap();
+    assert!(records[0].field("absent").is_err());
+}
