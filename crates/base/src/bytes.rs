@@ -4,6 +4,7 @@ use core::fmt;
 use core::hash::{Hash, Hasher};
 use core::ops::Deref;
 use subtle::ConstantTimeEq;
+use zeroize::Zeroize;
 
 /// Error returned when a byte sequence is longer than the buffer's maximum length `MAX`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -92,6 +93,14 @@ impl<const MAX: usize> ConstantTimeEq for Bytes<MAX> {
     fn ct_eq(&self, other: &Self) -> subtle::Choice {
         // Length is public; equal-length contents are compared with no early exit.
         self.0.as_slice().ct_eq(other.0.as_slice())
+    }
+}
+
+impl<const MAX: usize> Zeroize for Bytes<MAX> {
+    fn zeroize(&mut self) {
+        // Overwrite the live bytes in place. `zeroize` uses volatile writes, so the
+        // compiler cannot optimize the wipe away; the length is left unchanged.
+        self.0.as_mut_slice().zeroize();
     }
 }
 
