@@ -68,3 +68,35 @@ impl CryptoProfile {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn showcase_profile_bundle() {
+        let p = CryptoProfile::Showcase;
+        assert_eq!(p.general_sig(), SigAlg::MlDsa65);
+        assert_eq!(p.kem(), KemAlg::MlKem768);
+        assert_eq!(p.hybrid_kem(), KemAlg::X25519MlKem768);
+        assert_eq!(p.aead(), AeadAlg::Aes256Gcm);
+        assert_eq!(p.kdf(), KdfAlg::HkdfSha256);
+        assert_eq!(p.hash(), HashAlg::Sha256);
+    }
+
+    #[test]
+    fn cnsa20_profile_bundle() {
+        let p = CryptoProfile::Cnsa20;
+        assert_eq!(p.general_sig(), SigAlg::MlDsa87);
+        assert_eq!(p.kem(), KemAlg::MlKem1024);
+        assert_eq!(p.hybrid_kem(), KemAlg::X25519MlKem1024);
+        assert_eq!(p.aead(), AeadAlg::Aes256Gcm);
+        assert_eq!(p.kdf(), KdfAlg::HkdfSha384);
+        assert_eq!(p.hash(), HashAlg::Sha384);
+    }
+
+    #[test]
+    fn default_is_showcase() {
+        assert_eq!(CryptoProfile::default(), CryptoProfile::Showcase);
+    }
+}
