@@ -12,3 +12,4 @@ alloc = []
 
 [dependencies]
 base = { package = "koffer-base", path = "../base" }
+rand_core = { version = "0.6.4", default-features = false }
