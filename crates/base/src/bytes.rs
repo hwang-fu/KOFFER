@@ -22,3 +22,22 @@ impl fmt::Display for TooLong {
 }
 
 impl core::error::Error for TooLong {}
+
+/// A variable-length byte buffer holding at most `MAX` bytes.
+///
+/// Backed by a fixed-capacity inline buffer (no heap), so it carries its worst-case
+/// size and never allocates. Construction rejects any sequence longer than `MAX`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+pub struct Bytes<const MAX: usize>(heapless::Vec<u8, MAX>);
+
+impl<const MAX: usize> Bytes<MAX> {
+    /// Creates an empty buffer.
+    pub const fn new() -> Self {
+        Bytes(heapless::Vec::new())
+    }
+
+    /// Returns the contents as a byte slice.
+    pub fn as_slice(&self) -> &[u8] {
+        self.0.as_slice()
+    }
+}
