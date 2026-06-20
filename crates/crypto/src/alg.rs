@@ -8,8 +8,6 @@
 pub enum SigAlg {
     /// HSS/LMS hash-based signatures, SHA-256.
     HssLmsSha256,
-    /// Single-tree LMS hash-based signatures, SHA-256.
-    LmsSha256,
     /// ML-DSA-65 lattice signatures.
     MlDsa65,
     /// ML-DSA-87 lattice signatures.
@@ -42,3 +40,24 @@ const COSE_ML_KEM_768: i32 = -65539;
 const COSE_ML_KEM_1024: i32 = -65540;
 const COSE_X25519_ML_KEM_768: i32 = -65541;
 const COSE_X25519_ML_KEM_1024: i32 = -65542;
+
+impl SigAlg {
+    /// The COSE algorithm codepoint that identifies this algorithm on the wire.
+    pub fn cose_id(self) -> i32 {
+        match self {
+            SigAlg::HssLmsSha256 => COSE_HSS_LMS,
+            SigAlg::MlDsa65 => COSE_ML_DSA_65,
+            SigAlg::MlDsa87 => COSE_ML_DSA_87,
+        }
+    }
+
+    /// The algorithm for a COSE codepoint, or `None` if it is not recognized.
+    pub fn from_cose_id(id: i32) -> Option<Self> {
+        match id {
+            COSE_HSS_LMS => Some(SigAlg::HssLmsSha256),
+            COSE_ML_DSA_65 => Some(SigAlg::MlDsa65),
+            COSE_ML_DSA_87 => Some(SigAlg::MlDsa87),
+            _ => None,
+        }
+    }
+}
