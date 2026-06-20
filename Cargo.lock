@@ -83,6 +83,9 @@ dependencies = [
 [[package]]
 name = "koffer-crypto"
 version = "0.1.0"
+dependencies = [
+ "koffer-base",
+]
 
 [[package]]
 name = "koffer-proto"

@@ -9,3 +9,6 @@ repository.workspace = true
 default = []
 std = ["alloc"]
 alloc = []
+
+[dependencies]
+base = { package = "koffer-base", path = "../base" }
