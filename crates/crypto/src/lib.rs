@@ -36,3 +36,26 @@ macro_rules! byte_value {
 pub mod error;
 pub mod kem;
 pub mod sign;
+
+#[cfg(test)]
+mod tests {
+    const TEST_MAX: usize = 4;
+
+    byte_value! {
+        /// Throwaway value type, defined only to exercise the `byte_value!` macro
+        /// that the real `sign` / `kem` value types are all generated from.
+        TestValue, TEST_MAX
+    }
+
+    #[test]
+    fn constructs_from_bytes_and_reads_back() {
+        let v = TestValue::try_from(&[1, 2, 3][..]).unwrap();
+        assert_eq!(v.as_slice(), &[1, 2, 3]);
+    }
+
+    #[test]
+    fn rejects_over_capacity() {
+        let over = [0u8; TEST_MAX + 1];
+        assert!(TestValue::try_from(&over[..]).is_err());
+    }
+}
