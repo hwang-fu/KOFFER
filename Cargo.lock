@@ -87,6 +87,7 @@ version = "0.1.0"
 dependencies = [
  "koffer-base",
  "rand_core 0.6.4",
+ "zeroize",
 ]
 
 [[package]]
