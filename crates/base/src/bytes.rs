@@ -124,4 +124,22 @@ mod tests {
         assert_eq!(b[1], 2); // Deref -> slice indexing
         assert_eq!(b.first(), Some(&1)); // Deref -> slice::first
     }
+
+    #[test]
+    fn equality_is_value_based() {
+        use subtle::ConstantTimeEq;
+        let a = Bytes::<8>::try_from(&[1, 2, 3][..]).unwrap();
+        let b = Bytes::<8>::try_from(&[1, 2, 3][..]).unwrap();
+        let c = Bytes::<8>::try_from(&[1, 2, 4][..]).unwrap();
+        let short = Bytes::<8>::try_from(&[1, 2][..]).unwrap();
+
+        // `==` is now constant-time but still means value equality.
+        assert_eq!(a, b);
+        assert_ne!(a, c);
+        assert_ne!(a, short);
+
+        // The constant-time primitive agrees.
+        assert!(bool::from(a.ct_eq(&b)));
+        assert!(!bool::from(a.ct_eq(&c)));
+    }
 }
