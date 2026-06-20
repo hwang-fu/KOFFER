@@ -11,7 +11,7 @@ const VERIFYING_KEY_MAX: usize = 2592; // ML-DSA-87 public key
 // parameters are fixed.
 const SIGNATURE_MAX: usize = 4627; // ML-DSA-87 signature
 
-byte_value! {
+secret_byte_value! {
     /// A secret signing key, as raw bytes.
     SigningKey, SIGNING_KEY_MAX
 }
