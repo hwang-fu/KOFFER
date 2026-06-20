@@ -151,4 +151,11 @@ mod tests {
         assert!(bool::from(a.ct_eq(&b)));
         assert!(!bool::from(a.ct_eq(&c)));
     }
+
+    #[test]
+    fn zeroize_overwrites_the_bytes() {
+        let mut b = Bytes::<8>::try_from(&[1, 2, 3, 4][..]).unwrap();
+        b.zeroize();
+        assert_eq!(b.as_slice(), &[0, 0, 0, 0]);
+    }
 }
