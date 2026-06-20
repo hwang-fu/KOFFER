@@ -87,7 +87,7 @@ version = "0.1.0"
 name = "koffer-proto"
 version = "0.1.0"
 dependencies = [
- "heapless",
+ "koffer-base",
  "minicbor",
  "proptest",
 ]
