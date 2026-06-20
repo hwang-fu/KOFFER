@@ -28,3 +28,17 @@ pub enum KemAlg {
     /// Hybrid X25519 + ML-KEM-1024.
     X25519MlKem1024,
 }
+
+// COSE algorithm codepoints. `-46` is the IANA-registered HSS-LMS identifier
+// (RFC 8778). The others have no stable COSE registration yet, so they are
+// pinned to project-local values in COSE's Private Use range (codepoints below
+// -65536, which IANA will not assign) -- swap to official codepoints if those
+// are registered later. Signatures and KEMs share one COSE codepoint namespace,
+// so every value below is distinct.
+const COSE_HSS_LMS: i32 = -46;
+const COSE_ML_DSA_65: i32 = -65537;
+const COSE_ML_DSA_87: i32 = -65538;
+const COSE_ML_KEM_768: i32 = -65539;
+const COSE_ML_KEM_1024: i32 = -65540;
+const COSE_X25519_ML_KEM_768: i32 = -65541;
+const COSE_X25519_ML_KEM_1024: i32 = -65542;
