@@ -1,7 +1,10 @@
-//! Catalog of the signature and KEM algorithms KOFFER supports.
+//! Catalog of the cryptographic algorithms KOFFER supports.
 //!
-//! Each supported algorithm is one variant of `SigAlg` or `KemAlg` -- small tag
-//! values chosen at the call site to select a backend.
+//! Each supported algorithm is one variant of an enum here -- small tag values
+//! chosen at the call site to select a backend. The signature and KEM algorithms
+//! (`SigAlg`, `KemAlg`) also map to a stable integer COSE codepoint, the only form
+//! that travels on the wire; the symmetric and hashing algorithms do not carry a
+//! codepoint yet.
 
 /// A supported signature algorithm.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -25,6 +28,33 @@ pub enum KemAlg {
     X25519MlKem768,
     /// Hybrid X25519 + ML-KEM-1024.
     X25519MlKem1024,
+}
+
+/// A supported authenticated-encryption (AEAD) algorithm.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AeadAlg {
+    /// AES-256-GCM.
+    Aes256Gcm,
+    /// ChaCha20-Poly1305.
+    ChaCha20Poly1305,
+}
+
+/// A supported key-derivation function (KDF).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KdfAlg {
+    /// HKDF with SHA-256.
+    HkdfSha256,
+    /// HKDF with SHA-384.
+    HkdfSha384,
+}
+
+/// A supported hash function.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HashAlg {
+    /// SHA-256.
+    Sha256,
+    /// SHA-384.
+    Sha384,
 }
 
 // COSE algorithm codepoints. `-46` is the IANA-registered HSS-LMS identifier
