@@ -2,8 +2,9 @@
 
 use crate::error::KemError;
 
-// Provisional capacities -- the hybrid figures add X25519's 32 bytes to the
-// ML-KEM-1024 sizes. Placeholders pending the full set of supported algorithms.
+// Buffer capacities, each the largest over the supported KEM algorithms -- the
+// hybrid X25519 + ML-KEM-1024 sizes. The key and ciphertext figures add X25519's
+// 32 bytes to the ML-KEM-1024 size; the shared secret is the combiner's output.
 const ENCAPSULATION_KEY_MAX: usize = 1600; // X25519 (32) + ML-KEM-1024 ek (1568)
 const DECAPSULATION_KEY_MAX: usize = 3200; // X25519 (32) + ML-KEM-1024 dk (3168)
 const CIPHERTEXT_MAX: usize = 1600; // X25519 (32) + ML-KEM-1024 ct (1568)

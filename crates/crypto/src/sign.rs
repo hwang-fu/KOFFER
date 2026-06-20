@@ -2,11 +2,14 @@
 
 use crate::error::{SignError, VerifyError};
 
-// Provisional capacities -- each sized to the largest supported algorithm for its
-// role. Placeholders pending the full set of supported algorithms; not final sizes.
+// Buffer capacities, each the largest over the supported signature algorithms.
+// ML-DSA-87 is the largest for the key sizes; the HSS/LMS keys are much smaller.
 const SIGNING_KEY_MAX: usize = 4896; // ML-DSA-87 secret key
 const VERIFYING_KEY_MAX: usize = 2592; // ML-DSA-87 public key
-const SIGNATURE_MAX: usize = 4627; // ML-DSA-87 signature (HSS may exceed this)
+// Provisional: presently ML-DSA-87's signature length. The HSS/LMS signature size
+// depends on parameters not yet chosen and may exceed this; raise it once those
+// parameters are fixed.
+const SIGNATURE_MAX: usize = 4627; // ML-DSA-87 signature
 
 byte_value! {
     /// A secret signing key, as raw bytes.
