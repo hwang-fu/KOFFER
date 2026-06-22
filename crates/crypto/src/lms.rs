@@ -7,6 +7,11 @@ use core::marker::PhantomData;
 
 use hbs_lms::HashChain;
 
+use crate::{
+    error::VerifyError,
+    sign::{Signature, Verifier, VerifyingKey},
+};
+
 /// The LMS/HSS backend over hash chain `H`.
 pub struct Lms<H: HashChain>(PhantomData<H>);
 
@@ -20,5 +25,19 @@ impl<H: HashChain> Lms<H> {
 impl<H: HashChain> Default for Lms<H> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl<H: HashChain> Verifier for Lms<H> {
+    fn verify(
+        &self,
+        key: &VerifyingKey,
+        message: &[u8],
+        signature: &Signature,
+    ) -> Result<(), VerifyError> {
+        // hbs-lms returns an opaque error; any failure -- bad signature, malformed
+        // bytes, or a hash typecode that does not match `H` -- is a verify failure.
+        hbs_lms::verify::<H>(message, signature.as_slice(), key.as_slice())
+            .map_err(|_| VerifyError::VerificationFailed)
     }
 }
