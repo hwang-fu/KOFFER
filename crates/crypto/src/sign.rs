@@ -6,9 +6,10 @@ use crate::error::{SignError, VerifyError};
 // ML-DSA-87 is the largest for the key sizes; the HSS/LMS keys are much smaller.
 const SIGNING_KEY_MAX: usize = 4896; // ML-DSA-87 secret key
 const VERIFYING_KEY_MAX: usize = 2592; // ML-DSA-87 public key
-// Provisional: presently ML-DSA-87's signature length. The HSS/LMS signature size
-// depends on parameters not yet chosen and may exceed this; raise it once those
-// parameters are fixed.
+
+// Largest over the supported signature algorithms: ML-DSA-87's signature. The
+// HSS/LMS parameters are now fixed, and its largest signature (2-level HSS, H=10,
+// w=8, SHA-256) is about 2964 bytes -- comfortably under this.
 const SIGNATURE_MAX: usize = 4627; // ML-DSA-87 signature
 
 secret_byte_value! {
