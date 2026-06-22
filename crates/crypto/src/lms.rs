@@ -5,7 +5,7 @@
 
 use core::marker::PhantomData;
 
-use hbs_lms::HashChain;
+use hbs_lms::{HashChain, HssParameter, LmotsAlgorithm, LmsAlgorithm, Sha256_192, Sha256_256};
 
 use crate::{
     error::VerifyError,
@@ -40,4 +40,20 @@ impl<H: HashChain> Verifier for Lms<H> {
         hbs_lms::verify::<H>(message, signature.as_slice(), key.as_slice())
             .map_err(|_| VerifyError::VerificationFailed)
     }
+}
+
+/// Profile S parameters: 2-level HSS, height 10 per level, Winternitz w=8, SHA-256.
+pub fn showcase_params() -> [HssParameter<Sha256_256>; 2] {
+    [
+        HssParameter::new(LmotsAlgorithm::LmotsW8, LmsAlgorithm::LmsH10),
+        HssParameter::new(LmotsAlgorithm::LmotsW8, LmsAlgorithm::LmsH10),
+    ]
+}
+
+/// Profile C parameters: single-tree LMS, height 10, Winternitz w=8, SHA-256/192.
+pub fn cnsa20_params() -> [HssParameter<Sha256_192>; 1] {
+    [HssParameter::new(
+        LmotsAlgorithm::LmotsW8,
+        LmsAlgorithm::LmsH10,
+    )]
 }
