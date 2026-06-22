@@ -5,11 +5,13 @@
 
 use core::marker::PhantomData;
 
-use hbs_lms::{HashChain, HssParameter, LmotsAlgorithm, LmsAlgorithm, Sha256_192, Sha256_256};
+use hbs_lms::{
+    HashChain, HssParameter, LmotsAlgorithm, LmsAlgorithm, Seed, Sha256_192, Sha256_256,
+};
 
 use crate::{
-    error::VerifyError,
-    sign::{Signature, Verifier, VerifyingKey},
+    error::{SignError, VerifyError},
+    sign::{Signature, SigningKey, Verifier, VerifyingKey},
 };
 
 /// The LMS/HSS backend over hash chain `H`.
@@ -19,6 +21,24 @@ impl<H: HashChain> Lms<H> {
     /// Creates the backend.
     pub const fn new() -> Self {
         Self(PhantomData)
+    }
+
+    /// Generates a key pair for `params`, drawing the seed from `entropy`, which must
+    /// be at least the hash output size (32 bytes for SHA-256, 24 for SHA-256/192).
+    /// The device supplies TRNG bytes here; tests supply a fixed seed.
+    pub fn keygen(
+        &self,
+        params: &[HssParameter<H>],
+        entropy: &[u8],
+    ) -> Result<(SigningKey, VerifyingKey), SignError> {
+        let seed = seed_from_entropy::<H>(entropy)?;
+        let aux_data: Option<&mut &mut [u8]> = None;
+        let (sk, vk) =
+            hbs_lms::keygen::<H>(params, &seed, aux_data).map_err(|_| SignError::Internal)?;
+        Ok((
+            SigningKey::try_from(sk.as_slice()).map_err(|_| SignError::Internal)?,
+            VerifyingKey::try_from(vk.as_slice()).map_err(|_| SignError::Internal)?,
+        ))
     }
 }
 
@@ -56,4 +76,16 @@ pub fn cnsa20_params() -> [HssParameter<Sha256_192>; 1] {
         LmotsAlgorithm::LmotsW8,
         LmsAlgorithm::LmsH10,
     )]
+}
+
+/// Copies the hash's seed-length bytes out of `entropy` into an hbs-lms `Seed`.
+fn seed_from_entropy<H: HashChain>(entropy: &[u8]) -> Result<Seed<H>, SignError> {
+    let mut seed = Seed::<H>::default();
+    let dst = seed.as_mut_slice();
+    let n = dst.len();
+    if entropy.len() < n {
+        return Err(SignError::Internal);
+    }
+    dst.copy_from_slice(&entropy[..n]);
+    Ok(seed)
 }
