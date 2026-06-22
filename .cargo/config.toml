@@ -1,0 +1,6 @@
+# Spawned threads -- including every `cargo test` thread -- default to a 2 MB stack,
+# which hbs-lms's heap-free keygen/sign overflow at the H=10 profile height. Give the
+# test threads more room. The Rust test harness reads RUST_MIN_STACK when it spawns
+# each test thread, and Cargo applies this `[env]` to the test binary in CI and locally.
+[env]
+RUST_MIN_STACK = "16777216"  # 16 MB
