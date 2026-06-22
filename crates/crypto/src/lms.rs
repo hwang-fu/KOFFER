@@ -126,6 +126,7 @@ fn seed_from_entropy<H: HashChain>(entropy: &[u8]) -> Result<Seed<H>, SignError>
 mod tests {
     use super::*;
     use crate::kat::parse;
+    use proptest::prelude::*;
 
     const TC1: &str = include_str!("../../../kat/lms/rfc8554-tc1.kat");
     const TC2: &str = include_str!("../../../kat/lms/rfc8554-tc2.kat");
@@ -156,5 +157,69 @@ mod tests {
     #[test]
     fn rfc8554_testcase2_verifies() {
         verify_vector(TC2);
+    }
+
+    fn round_trip<H: HashChain>(backend: &Lms<H>, params: &[HssParameter<H>]) {
+        let (sk, vk) = backend.keygen(params, &[0x42u8; 32]).unwrap();
+        let message = b"firmware image";
+        let signature = backend.sign(&sk, message, &mut |_| Ok(())).unwrap();
+        backend.verify(&vk, message, &signature).unwrap();
+    }
+
+    #[test]
+    fn showcase_profile_round_trips() {
+        round_trip(&Lms::<Sha256_256>::new(), &showcase_params());
+    }
+
+    #[test]
+    fn cnsa20_profile_round_trips() {
+        round_trip(&Lms::<Sha256_192>::new(), &cnsa20_params());
+    }
+
+    #[test]
+    fn verify_rejects_tampering() {
+        let backend = Lms::<Sha256_256>::new();
+        let (sk, vk) = backend.keygen(&showcase_params(), &[0x42u8; 32]).unwrap();
+        let message = b"firmware image";
+        let signature = backend.sign(&sk, message, &mut |_| Ok(())).unwrap();
+        backend.verify(&vk, message, &signature).unwrap(); // genuine triple verifies
+
+        // tampered message
+        let mut bad_message = message.to_vec();
+        bad_message[0] ^= 0x01;
+        assert!(backend.verify(&vk, &bad_message, &signature).is_err());
+
+        // tampered signature (a byte well inside the body)
+        let mut sig_bytes = signature.as_slice().to_vec();
+        let mid = sig_bytes.len() / 2;
+        sig_bytes[mid] ^= 0x01;
+        let bad_signature = Signature::try_from(sig_bytes.as_slice()).unwrap();
+        assert!(backend.verify(&vk, message, &bad_signature).is_err());
+
+        // wrong public key
+        let (_, wrong_vk) = backend.keygen(&showcase_params(), &[0x99u8; 32]).unwrap();
+        assert!(backend.verify(&wrong_vk, message, &signature).is_err());
+    }
+
+    // Keygen/sign are O(2^H), so key once and cap cases rather than re-keying per case.
+    fn showcase_keypair() -> &'static (SigningKey, VerifyingKey) {
+        static KP: std::sync::OnceLock<(SigningKey, VerifyingKey)> = std::sync::OnceLock::new();
+        KP.get_or_init(|| {
+            Lms::<Sha256_256>::new()
+                .keygen(&showcase_params(), &[0x42u8; 32])
+                .unwrap()
+        })
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig { cases: 32, ..ProptestConfig::default() })]
+
+        #[test]
+        fn sign_then_verify(message in prop::collection::vec(any::<u8>(), 0..512)) {
+            let (sk, vk) = showcase_keypair();
+            let backend = Lms::<Sha256_256>::new();
+            let signature = backend.sign(sk, &message, &mut |_| Ok(())).unwrap();
+            prop_assert!(backend.verify(vk, &message, &signature).is_ok());
+        }
     }
 }
