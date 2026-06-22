@@ -18,3 +18,15 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - run: cargo test --workspace --all-features
+
+  # Second host arch. Runs on the pre-merge gate rather than on every push, so the
+  # push loop stays fast while a merge still exercises the suite on aarch64.
+  host-arm:
+    name: host (ubuntu-24.04-arm)
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --workspace --all-targets
+      - run: cargo test --workspace

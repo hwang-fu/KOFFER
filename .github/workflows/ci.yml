@@ -21,13 +21,9 @@ concurrency:
 
 jobs:
   host:
-    name: host (${{ matrix.runner }})
+    name: host (ubuntu-latest)
     if: ${{ !startsWith(github.event.head_commit.message, 'docs') }}
-    strategy:
-      fail-fast: false
-      matrix:
-        runner: [ubuntu-latest, ubuntu-24.04-arm]
-    runs-on: ${{ matrix.runner }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Provision pinned toolchain
@@ -38,10 +34,8 @@ jobs:
       - name: Test
         run: cargo test --workspace
       - name: Format
-        if: matrix.runner == 'ubuntu-latest'
         run: cargo fmt --all --check
       - name: Clippy
-        if: matrix.runner == 'ubuntu-latest'
         run: cargo clippy --workspace --all-targets -- -D warnings
 
   embedded:
