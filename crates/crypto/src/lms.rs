@@ -11,7 +11,7 @@ use hbs_lms::{
 
 use crate::{
     error::{SignError, VerifyError},
-    sign::{Signature, SigningKey, Verifier, VerifyingKey},
+    sign::{Signature, SigningKey, StatefulSigner, Verifier, VerifyingKey},
 };
 
 /// The LMS/HSS backend over hash chain `H`.
@@ -45,6 +45,38 @@ impl<H: HashChain> Lms<H> {
 impl<H: HashChain> Default for Lms<H> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl<H: HashChain> StatefulSigner for Lms<H> {
+    fn sign(
+        &self,
+        key: &SigningKey,
+        message: &[u8],
+        persist: &mut dyn FnMut(&[u8]) -> Result<(), SignError>,
+    ) -> Result<Signature, SignError> {
+        // hbs-lms's update callback returns `Result<(), ()>`, so we stash our richer
+        // `SignError` in `persist_error` to surface a real persist failure instead of
+        // a generic one. The advanced-key bytes pass straight through to `persist`.
+        let mut persist_error: Option<SignError> = None;
+        let aux_data: Option<&mut &mut [u8]> = None;
+        let result = {
+            let mut update = |advanced: &[u8]| -> Result<(), ()> {
+                match persist(advanced) {
+                    Ok(()) => Ok(()),
+                    Err(e) => {
+                        persist_error = Some(e);
+                        Err(())
+                    }
+                }
+            };
+            hbs_lms::sign::<H>(message, key.as_slice(), &mut update, aux_data)
+        };
+
+        match result {
+            Ok(sig) => Signature::try_from(sig.as_ref()).map_err(|_| SignError::Internal),
+            Err(_) => Err(persist_error.unwrap_or(SignError::Internal)),
+        }
     }
 }
 
