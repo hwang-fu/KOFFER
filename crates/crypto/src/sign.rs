@@ -35,6 +35,26 @@ pub trait Signer {
     fn sign(&self, key: &SigningKey, message: &[u8]) -> Result<Signature, SignError>;
 }
 
+/// A stateful signing backend for hash-based schemes (LMS/HSS).
+///
+/// Each signature consumes a one-time key, so the signer advances the private-key
+/// state and -- before returning the signature -- hands the advanced key bytes to
+/// `persist` for durable storage. This is the write-before-use discipline: if the
+/// caller crashes after signing, it restarts from the persisted (advanced) state
+/// and never reuses a one-time key.
+pub trait StatefulSigner {
+    /// Signs `message` with `key`, calling `persist` with the advanced private-key
+    /// bytes before the signature is returned. A `persist` failure aborts the sign
+    /// (no signature is released), so the stored state and the returned signature
+    /// can never disagree.
+    fn sign(
+        &self,
+        key: &SigningKey,
+        message: &[u8],
+        persist: &mut dyn FnMut(&[u8]) -> Result<(), SignError>,
+    ) -> Result<Signature, SignError>;
+}
+
 /// A verifying backend: checks a signature against a verifying key and message.
 pub trait Verifier {
     /// Checks `signature` over `message` against `key`.
