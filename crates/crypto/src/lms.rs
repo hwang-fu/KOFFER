@@ -121,3 +121,40 @@ fn seed_from_entropy<H: HashChain>(entropy: &[u8]) -> Result<Seed<H>, SignError>
     dst.copy_from_slice(&entropy[..n]);
     Ok(seed)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::kat::parse;
+
+    const TC1: &str = include_str!("../../../kat/lms/rfc8554-tc1.kat");
+    const TC2: &str = include_str!("../../../kat/lms/rfc8554-tc2.kat");
+
+    fn verify_vector(vector: &str) {
+        let records = parse(vector).unwrap();
+        let backend = Lms::<Sha256_256>::new();
+        for record in &records {
+            let public_key = VerifyingKey::try_from(record.field("public_key").unwrap()).unwrap();
+            let message = record.field("message").unwrap();
+            let signature = Signature::try_from(record.field("signature").unwrap()).unwrap();
+
+            // The published signature verifies.
+            backend.verify(&public_key, message, &signature).unwrap();
+
+            // A one-bit-tampered message does not.
+            let mut tampered = message.to_vec();
+            tampered[0] ^= 0x01;
+            assert!(backend.verify(&public_key, &tampered, &signature).is_err());
+        }
+    }
+
+    #[test]
+    fn rfc8554_testcase1_verifies() {
+        verify_vector(TC1);
+    }
+
+    #[test]
+    fn rfc8554_testcase2_verifies() {
+        verify_vector(TC2);
+    }
+}
