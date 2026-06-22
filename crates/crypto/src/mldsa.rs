@@ -6,11 +6,11 @@
 
 use core::marker::PhantomData;
 
-use ml_dsa::{KeyInit, Keypair, MlDsaParams};
+use ml_dsa::{KeyInit, Keypair, MlDsaParams, Signer as _, Verifier as _};
 
 use crate::{
-    error::SignError,
-    sign::{SigningKey, VerifyingKey},
+    error::{SignError, VerifyError},
+    sign::{Signature, Signer, SigningKey, Verifier, VerifyingKey},
 };
 
 /// The ML-DSA backend over parameter set `P`.
@@ -42,5 +42,37 @@ impl<P: MlDsaParams> MlDsa<P> {
 impl<P: MlDsaParams> Default for MlDsa<P> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl<P: MlDsaParams> Signer for MlDsa<P> {
+    fn sign(&self, key: &SigningKey, message: &[u8]) -> Result<Signature, SignError> {
+        // Our signing key is the 32-byte seed; re-expand it for each signature. ML-DSA
+        // signing is deterministic, so this needs no randomness.
+        let signing_key = ml_dsa::SigningKey::<P>::new_from_slice(key.as_slice())
+            .map_err(|_| SignError::MalformedKey)?;
+        let signature = signing_key
+            .try_sign(message)
+            .map_err(|_| SignError::Internal)?;
+        Signature::try_from(signature.encode().as_ref()).map_err(|_| SignError::Internal)
+    }
+}
+
+impl<P: MlDsaParams> Verifier for MlDsa<P> {
+    fn verify(
+        &self,
+        key: &VerifyingKey,
+        message: &[u8],
+        signature: &Signature,
+    ) -> Result<(), VerifyError> {
+        // Distinguish a malformed public key, an unreadable signature, and a genuine
+        // mismatch -- ml-dsa surfaces each separately, unlike the opaque hash-based path.
+        let verifying_key = ml_dsa::VerifyingKey::<P>::new_from_slice(key.as_slice())
+            .map_err(|_| VerifyError::MalformedKey)?;
+        let signature = ml_dsa::Signature::<P>::try_from(signature.as_slice())
+            .map_err(|_| VerifyError::MalformedSignature)?;
+        verifying_key
+            .verify(message, &signature)
+            .map_err(|_| VerifyError::VerificationFailed)
     }
 }
