@@ -88,6 +88,7 @@ macro_rules! secret_byte_value {
 pub mod alg;
 pub mod error;
 pub mod kem;
+pub mod lms;
 pub mod profile;
 pub mod sign;
 

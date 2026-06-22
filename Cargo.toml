@@ -6,3 +6,10 @@ members = ["crates/base", "crates/proto", "crates/crypto"]
 edition = "2024"
 rust-version = "1.96"
 repository = "https://github.com/hwang-fu/KOFFER"
+
+# Optimize dependencies even in dev / test builds. The hash-based-signature backend
+# does millions of SHA-256 operations per keygen/sign, which is unbearably slow in an
+# unoptimized build; this keeps our own crates fast to compile while the crypto
+# dependencies run at full speed.
+[profile.dev.package."*"]
+opt-level = 3
