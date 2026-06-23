@@ -10,7 +10,7 @@ const DECAPSULATION_KEY_MAX: usize = 3200; // X25519 (32) + ML-KEM-1024 dk (3168
 const CIPHERTEXT_MAX: usize = 1600; // X25519 (32) + ML-KEM-1024 ct (1568)
 const SHARED_SECRET_MAX: usize = 32; // combiner output
 
-byte_value! {
+bytes_newtype! {
     /// A public encapsulation key, as raw bytes.
     EncapsulationKey, ENCAPSULATION_KEY_MAX
 }
@@ -20,7 +20,7 @@ secret_bytes_newtype! {
     DecapsulationKey, DECAPSULATION_KEY_MAX
 }
 
-byte_value! {
+bytes_newtype! {
     /// A KEM ciphertext (the sealed value), as raw bytes.
     Ciphertext, CIPHERTEXT_MAX
 }

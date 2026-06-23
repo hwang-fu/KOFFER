@@ -23,7 +23,7 @@ extern crate alloc;
 /// Defines a byte-backed crypto value: a distinct newtype over `base::Bytes<MAX>`,
 /// constructed from a length-checked byte slice and -- via `base::Bytes` -- compared
 /// in constant time. Used for the value types in `sign` and `kem`.
-macro_rules! byte_value {
+macro_rules! bytes_newtype {
     ($(#[$attr:meta])* $name:ident, $max:ident) => {
         $(#[$attr])*
         #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,7 +46,7 @@ macro_rules! byte_value {
     };
 }
 
-/// Like `byte_value!`, but for secret material: the value wipes its bytes on drop,
+/// Like `bytes_newtype!`, but for secret material: the value wipes its bytes on drop,
 /// and its `Debug` is redacted so the secret never reaches a log or panic message.
 macro_rules! secret_bytes_newtype {
     ($(#[$attr:meta])* $name:ident, $max:ident) => {
@@ -103,8 +103,8 @@ mod mock;
 mod tests {
     const TEST_MAX: usize = 4;
 
-    byte_value! {
-        /// Throwaway value type, defined only to exercise the `byte_value!` macro
+    bytes_newtype! {
+        /// Throwaway value type, defined only to exercise the `bytes_newtype!` macro
         /// that the real `sign` / `kem` value types are all generated from.
         TestValue, TEST_MAX
     }

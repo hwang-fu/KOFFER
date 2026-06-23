@@ -17,12 +17,12 @@ secret_bytes_newtype! {
     SigningKey, SIGNING_KEY_MAX
 }
 
-byte_value! {
+bytes_newtype! {
     /// A public verifying key, as raw bytes.
     VerifyingKey, VERIFYING_KEY_MAX
 }
 
-byte_value! {
+bytes_newtype! {
     /// A signature, as raw bytes.
     Signature, SIGNATURE_MAX
 }
