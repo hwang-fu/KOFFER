@@ -48,7 +48,7 @@ macro_rules! byte_value {
 
 /// Like `byte_value!`, but for secret material: the value wipes its bytes on drop,
 /// and its `Debug` is redacted so the secret never reaches a log or panic message.
-macro_rules! secret_byte_value {
+macro_rules! secret_bytes_newtype {
     ($(#[$attr:meta])* $name:ident, $max:ident) => {
         $(#[$attr])*
         #[derive(Clone, PartialEq, Eq)]
@@ -121,8 +121,8 @@ mod tests {
         assert!(TestValue::try_from(&over[..]).is_err());
     }
 
-    secret_byte_value! {
-        /// Throwaway secret type, defined only to exercise the `secret_byte_value!`
+    secret_bytes_newtype! {
+        /// Throwaway secret type, defined only to exercise the `secret_bytes_newtype!`
         /// macro that the real secret value types are generated from.
         SecretTestValue, TEST_MAX
     }

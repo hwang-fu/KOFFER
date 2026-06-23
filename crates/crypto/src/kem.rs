@@ -15,7 +15,7 @@ byte_value! {
     EncapsulationKey, ENCAPSULATION_KEY_MAX
 }
 
-secret_byte_value! {
+secret_bytes_newtype! {
     /// A secret decapsulation key, as raw bytes.
     DecapsulationKey, DECAPSULATION_KEY_MAX
 }
@@ -25,7 +25,7 @@ byte_value! {
     Ciphertext, CIPHERTEXT_MAX
 }
 
-secret_byte_value! {
+secret_bytes_newtype! {
     /// A derived shared secret, as raw bytes.
     SharedSecret, SHARED_SECRET_MAX
 }
