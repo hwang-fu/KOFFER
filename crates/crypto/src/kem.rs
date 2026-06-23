@@ -41,7 +41,7 @@ pub trait Kem {
     fn encapsulate(
         &self,
         key: &EncapsulationKey,
-        rng: &mut dyn rand_core::CryptoRngCore,
+        rng: &mut dyn rand_core::CryptoRng,
     ) -> Result<(Ciphertext, SharedSecret), KemError>;
 
     /// Recovers the shared secret from `ciphertext` using `key`.
