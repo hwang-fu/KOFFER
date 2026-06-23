@@ -80,6 +80,7 @@ impl<P: MlDsaParams> Verifier for MlDsa<P> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::kat::parse;
     use ml_dsa::{MlDsa65, MlDsa87};
     use proptest::prelude::*;
 
@@ -173,5 +174,27 @@ mod tests {
             let signature = backend.sign(sk, &message).unwrap();
             prop_assert!(backend.verify(vk, &message, &signature).is_ok());
         }
+    }
+
+    const SIGN_65: &str = include_str!("../../../kat/mldsa/wycheproof-sign-65.kat");
+    const SIGN_87: &str = include_str!("../../../kat/mldsa/wycheproof-sign-87.kat");
+
+    // keyGen (seed -> public key) and deterministic sign (seed + message -> signature),
+    // replayed against the Wycheproof vectors.
+    fn sign_kat<P: MlDsaParams>(backend: &MlDsa<P>, vectors: &str) {
+        let records = parse(vectors).unwrap();
+        assert!(!records.is_empty());
+        for r in &records {
+            let (sk, vk) = backend.keygen(r.field("seed").unwrap()).unwrap();
+            assert_eq!(vk.as_slice(), r.field("public_key").unwrap());
+            let signature = backend.sign(&sk, r.field("message").unwrap()).unwrap();
+            assert_eq!(signature.as_slice(), r.field("signature").unwrap());
+        }
+    }
+
+    #[test]
+    fn wycheproof_sign_kat() {
+        sign_kat(&MlDsa::<MlDsa65>::new(), SIGN_65);
+        sign_kat(&MlDsa::<MlDsa87>::new(), SIGN_87);
     }
 }
