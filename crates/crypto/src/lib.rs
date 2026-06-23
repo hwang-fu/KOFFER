@@ -89,6 +89,7 @@ pub mod alg;
 pub mod error;
 pub mod kem;
 pub mod lms;
+pub mod mldsa;
 pub mod profile;
 pub mod sign;
 
