@@ -142,13 +142,19 @@ mod tests {
         let mut short = signature.as_slice().to_vec();
         short.pop();
         let short = Signature::try_from(short.as_slice()).unwrap();
-        assert_eq!(backend.verify(&vk, message, &short), Err(VerifyError::MalformedSignature));
+        assert_eq!(
+            backend.verify(&vk, message, &short),
+            Err(VerifyError::MalformedSignature)
+        );
 
         // a public key of the wrong length cannot be read as a key at all
         let mut short = vk.as_slice().to_vec();
         short.pop();
         let short = VerifyingKey::try_from(short.as_slice()).unwrap();
-        assert_eq!(backend.verify(&short, message, &signature), Err(VerifyError::MalformedKey));
+        assert_eq!(
+            backend.verify(&short, message, &signature),
+            Err(VerifyError::MalformedKey)
+        );
     }
 
     // ML-DSA keygen is cheap, but cache the keypair anyway and cap cases, matching the LMS proptest.
