@@ -60,9 +60,9 @@ impl Kem for Mock {
 }
 
 /// A deterministic counter RNG -- enough to satisfy `CryptoRng` in tests.
-struct CountingRng(u64);
+struct CounterRng(u64);
 
-impl TryRng for CountingRng {
+impl TryRng for CounterRng {
     type Error = Infallible;
 
     fn try_next_u32(&mut self) -> Result<u32, Infallible> {
@@ -83,7 +83,7 @@ impl TryRng for CountingRng {
     }
 }
 
-impl TryCryptoRng for CountingRng {}
+impl TryCryptoRng for CounterRng {}
 
 #[test]
 fn seam_composes_end_to_end() {
@@ -108,7 +108,7 @@ fn seam_composes_end_to_end() {
     );
 
     // Encapsulate / decapsulate: both sides agree on the shared secret.
-    let mut rng = CountingRng(0);
+    let mut rng = CounterRng(0);
     let ek = EncapsulationKey::try_from(&[0u8; 4][..]).unwrap();
     let dk = DecapsulationKey::try_from(&[0u8; 4][..]).unwrap();
     let (ciphertext, secret) = backend.encapsulate(&ek, &mut rng).unwrap();
