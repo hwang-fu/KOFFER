@@ -81,6 +81,7 @@ impl<P: MlDsaParams> Verifier for MlDsa<P> {
 mod tests {
     use super::*;
     use ml_dsa::{MlDsa65, MlDsa87};
+    use proptest::prelude::*;
 
     fn round_trip<P: MlDsaParams>(backend: &MlDsa<P>) {
         let (sk, vk) = backend.keygen(&[0x42u8; 32]).unwrap();
@@ -97,5 +98,74 @@ mod tests {
     #[test]
     fn mldsa87_round_trips() {
         round_trip(&MlDsa::<MlDsa87>::new());
+    }
+
+    #[test]
+    fn verify_rejects_tampering() {
+        let backend = MlDsa::<MlDsa65>::new();
+        let (sk, vk) = backend.keygen(&[0x42u8; 32]).unwrap();
+        let message = b"firmware image";
+        let signature = backend.sign(&sk, message).unwrap();
+        backend.verify(&vk, message, &signature).unwrap(); // genuine triple verifies
+
+        // tampered message: the signature is well-formed but no longer matches
+        let mut bad_message = message.to_vec();
+        bad_message[0] ^= 0x01;
+        assert_eq!(
+            backend.verify(&vk, &bad_message, &signature),
+            Err(VerifyError::VerificationFailed)
+        );
+
+        // tampered signature byte (still the right length, so it decodes but will not match)
+        let mut sig_bytes = signature.as_slice().to_vec();
+        let mid = sig_bytes.len() / 2;
+        sig_bytes[mid] ^= 0x01;
+        let tampered = Signature::try_from(sig_bytes.as_slice()).unwrap();
+        assert!(backend.verify(&vk, message, &tampered).is_err());
+
+        // wrong public key
+        let (_, wrong_vk) = backend.keygen(&[0x99u8; 32]).unwrap();
+        assert_eq!(
+            backend.verify(&wrong_vk, message, &signature),
+            Err(VerifyError::VerificationFailed)
+        );
+    }
+
+    #[test]
+    fn verify_rejects_malformed_inputs() {
+        let backend = MlDsa::<MlDsa65>::new();
+        let (sk, vk) = backend.keygen(&[0x42u8; 32]).unwrap();
+        let message = b"firmware image";
+        let signature = backend.sign(&sk, message).unwrap();
+
+        // a signature of the wrong length cannot be read as a signature at all
+        let mut short = signature.as_slice().to_vec();
+        short.pop();
+        let short = Signature::try_from(short.as_slice()).unwrap();
+        assert_eq!(backend.verify(&vk, message, &short), Err(VerifyError::MalformedSignature));
+
+        // a public key of the wrong length cannot be read as a key at all
+        let mut short = vk.as_slice().to_vec();
+        short.pop();
+        let short = VerifyingKey::try_from(short.as_slice()).unwrap();
+        assert_eq!(backend.verify(&short, message, &signature), Err(VerifyError::MalformedKey));
+    }
+
+    // ML-DSA keygen is cheap, but cache the keypair anyway and cap cases, matching the LMS proptest.
+    fn mldsa65_keypair() -> &'static (SigningKey, VerifyingKey) {
+        static KP: std::sync::OnceLock<(SigningKey, VerifyingKey)> = std::sync::OnceLock::new();
+        KP.get_or_init(|| MlDsa::<MlDsa65>::new().keygen(&[0x42u8; 32]).unwrap())
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig { cases: 32, ..ProptestConfig::default() })]
+
+        #[test]
+        fn sign_then_verify(message in prop::collection::vec(any::<u8>(), 0..512)) {
+            let (sk, vk) = mldsa65_keypair();
+            let backend = MlDsa::<MlDsa65>::new();
+            let signature = backend.sign(sk, &message).unwrap();
+            prop_assert!(backend.verify(vk, &message, &signature).is_ok());
+        }
     }
 }
