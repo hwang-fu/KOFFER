@@ -76,3 +76,26 @@ impl<P: MlDsaParams> Verifier for MlDsa<P> {
             .map_err(|_| VerifyError::VerificationFailed)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ml_dsa::{MlDsa65, MlDsa87};
+
+    fn round_trip<P: MlDsaParams>(backend: &MlDsa<P>) {
+        let (sk, vk) = backend.keygen(&[0x42u8; 32]).unwrap();
+        let message = b"firmware image";
+        let signature = backend.sign(&sk, message).unwrap();
+        backend.verify(&vk, message, &signature).unwrap();
+    }
+
+    #[test]
+    fn mldsa65_round_trips() {
+        round_trip(&MlDsa::<MlDsa65>::new());
+    }
+
+    #[test]
+    fn mldsa87_round_trips() {
+        round_trip(&MlDsa::<MlDsa87>::new());
+    }
+}
