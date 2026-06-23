@@ -210,7 +210,9 @@ mod tests {
             let vk = VerifyingKey::try_from(r.field("public_key").unwrap()).unwrap();
             let signature = Signature::try_from(r.field("signature").unwrap()).unwrap();
             let must_verify = r.field("result").unwrap()[0] == 0x01;
-            let ok = backend.verify(&vk, r.field("message").unwrap(), &signature).is_ok();
+            let ok = backend
+                .verify(&vk, r.field("message").unwrap(), &signature)
+                .is_ok();
             assert_eq!(ok, must_verify);
         }
     }
