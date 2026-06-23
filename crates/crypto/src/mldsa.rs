@@ -197,4 +197,27 @@ mod tests {
         sign_kat(&MlDsa::<MlDsa65>::new(), SIGN_65);
         sign_kat(&MlDsa::<MlDsa87>::new(), SIGN_87);
     }
+
+    const VERIFY_65: &str = include_str!("../../../kat/mldsa/wycheproof-verify-65.kat");
+    const VERIFY_87: &str = include_str!("../../../kat/mldsa/wycheproof-verify-87.kat");
+
+    // verify (public key + message + signature -> must-verify or must-reject), replayed
+    // against the Wycheproof vectors (valid and deliberately-broken cases).
+    fn verify_kat<P: MlDsaParams>(backend: &MlDsa<P>, vectors: &str) {
+        let records = parse(vectors).unwrap();
+        assert!(!records.is_empty());
+        for r in &records {
+            let vk = VerifyingKey::try_from(r.field("public_key").unwrap()).unwrap();
+            let signature = Signature::try_from(r.field("signature").unwrap()).unwrap();
+            let must_verify = r.field("result").unwrap()[0] == 0x01;
+            let ok = backend.verify(&vk, r.field("message").unwrap(), &signature).is_ok();
+            assert_eq!(ok, must_verify);
+        }
+    }
+
+    #[test]
+    fn wycheproof_verify_kat() {
+        verify_kat(&MlDsa::<MlDsa65>::new(), VERIFY_65);
+        verify_kat(&MlDsa::<MlDsa87>::new(), VERIFY_87);
+    }
 }
