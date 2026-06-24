@@ -75,9 +75,20 @@ macro_rules! impl_backend {
                 key: &DecapsulationKey,
                 ciphertext: &Ciphertext,
             ) -> Result<SharedSecret, KemError> {
-                // The decapsulation key is its 64-byte seed; re-derive it each call. ML-KEM
-                // decapsulation is constant-time and implicitly rejecting -- a well-formed but
-                // invalid ciphertext yields a pseudorandom secret, never an error.
+                // Constant-time, implicitly-rejecting decapsulation -- the secret-key path, so
+                // its timing must not depend on secret data. `ml-kem` provides the guarantee via
+                // `module-lattice`'s CT utilities: FIPS 203's re-encrypt-and-compare uses a
+                // constant-time equality (`ct_eq`), and the choice between the real shared secret
+                // and the pseudorandom rejection secret is a branchless `ct_select`, not an `if`.
+                // So an invalid (well-formed) ciphertext takes the same steps in the same time
+                // and returns a pseudorandom secret -- never an error, no distinguishing leak.
+                //
+                // Our wrapper adds no secret-dependent branch, index, or early return: the one
+                // branch (wrong-length ciphertext -> `MalformedCiphertext`) tests the public
+                // length, not the bytes. Re-deriving the key from the seed adds no secret-dependent
+                // timing either -- its only variable-time step, sampling the matrix `A`, is keyed
+                // on the public `rho`, which FIPS 203 decapsulation re-samples regardless.
+                // Empirical timing is measured separately.
                 let seed =
                     ml_kem::Seed::try_from(key.as_slice()).map_err(|_| KemError::MalformedKey)?;
                 let decapsulation_key = ml_kem::DecapsulationKey::<$param>::from_seed(seed);
@@ -98,6 +109,7 @@ mod tests {
     use super::*;
     use crate::kat::parse;
     use core::convert::Infallible;
+    use proptest::prelude::*;
 
     // A deterministic CryptoRng for tests -- enough randomness for encapsulation.
     struct TestRng(u64);
@@ -199,4 +211,23 @@ mod tests {
         mlkem1024_wycheproof_kat,
         include_str!("../../../kat/mlkem/wycheproof-1024.kat")
     );
+
+    macro_rules! roundtrip_proptest {
+        ($param:ty, $name:ident) => {
+            proptest! {
+                #![proptest_config(ProptestConfig { cases: 32, ..ProptestConfig::default() })]
+                #[test]
+                fn $name(rng_seed in any::<u64>()) {
+                    let backend = MlKem::<$param>::new();
+                    let (ek, dk) = backend.keygen(&[0x42u8; 64]).unwrap();
+                    let (ciphertext, sent) = backend.encapsulate(&ek, &mut TestRng(rng_seed)).unwrap();
+                    let recovered = backend.decapsulate(&dk, &ciphertext).unwrap();
+                    prop_assert_eq!(sent.as_slice(), recovered.as_slice());
+                }
+            }
+        };
+    }
+
+    roundtrip_proptest!(ml_kem::MlKem768, mlkem768_encapsulate_decapsulate);
+    roundtrip_proptest!(ml_kem::MlKem1024, mlkem1024_encapsulate_decapsulate);
 }
