@@ -1,0 +1,75 @@
+# HKDF-SHA-384 known-answer vectors, from Google/Project Wycheproof
+# source: testvectors_v1/hkdf_sha384_test.json -- Apache-2.0
+# derive(salt, ikm, info) -> okm. Valid cases only.
+
+# tcId 1: Normal,EmptySalt
+ikm = 24aeff2645e3e0f5494a9a102778c43a
+salt = 
+info = 
+okm = 4b7045423d9156424b0b85d95a7d602fba3924b1
+
+# tcId 2: Normal,EmptySalt
+ikm = a23632e18ec76b59b1c87008da3f8a7e
+salt = 
+info = 
+okm = 46cddd93b528a7b2df07a3d21e809d8980e1bf8faebfa48199779626ddbe925781ce9fc8de6b27eaeec7
+
+# tcId 3: Normal,EmptySalt
+ikm = a4748031a14d3e6aafe42aa20c568f5f
+salt = 
+info = 
+okm = 61c0d2797276f1b789397e5a4be75c961a77bdbad4cca2bd9a4160cb85fafb1b32f95d610c58766f29769d0c68b0bcfb15916d49b72e52ad2f3e7315618175d3
+
+# tcId 4: Normal,EmptySalt
+ikm = 06eb26f8ccf28580c8f28d5b4dc47a49
+salt = 
+info = d5f081e81e8cf9ded199f3ae43c80a2dfe3d9cf2
+okm = ac2b3c7b3a3538d5a471a03849208437e0c2201a
+
+# tcId 5: Normal,EmptySalt
+ikm = c181696a19ab1a32eb6e81b2925d8990
+salt = 
+info = d8c8de92fe5422c9825996354db1821ba43a81ac
+okm = bd5a9b85598010069c28028bd26949d44dd8312d0fe6cb3c49b2ab968de7aef4776c492e6c502056b419
+
+# tcId 6: Normal,EmptySalt
+ikm = 55fb6dcc7802354e55a45a6e41858c05
+salt = 
+info = dcd590e418b259c64fb9e139b3a1280d5de8400b
+okm = aeedc066b0ff9bd6fc13cba752a2fe8d2ffb9f013236d737e8e0031c4a5f287c67c6e7f0005d7766a2d7a4965c8c6c1e83c00f873f61002711969c709a4a0d66
+
+# tcId 7: Normal
+ikm = c27718560fae2515acb17a874991d357
+salt = 4487f538b65c9058625057b4bbdd93e7
+info = 
+okm = 836712c8a9a1c2402ca222d450c20c4101a89d80
+
+# tcId 8: Normal
+ikm = be0df9811ad0bf3b08358a3dc4a05981
+salt = c98618bfeb59295f8bf1dd3804b1bf2c
+info = 
+okm = 8b77bcd6637ce7c4a591b27ede42f59c34a1195b661fcfce6fc3d40a0362342831dc00b32d2767c41c33
+
+# tcId 9: Normal
+ikm = 529e91a61895f1c4ceb5b6994f48783b
+salt = 12e4ae515328983bab2d88da3cb32a95
+info = 
+okm = 9806d5f9c7636f589a340b775b74fac64880948d12c3a4545a9a4963b5bf4b8c90c3fb51a5d39dae5213ec31b55b587decfd6e361cc856b89c07c6e93ef165f9
+
+# tcId 10: Normal
+ikm = c360e16084cfd13cb44b0dc02d8665de
+salt = 685ac7df93701d6c78babd847861bb3c
+info = e0ddfaaaa7afb53f59a007a205c7149b5b5a72be
+okm = 00aa140387a3d43aae915c35b306533179019bab
+
+# tcId 11: Normal
+ikm = 0cbd136d66d15a4ffefde1303b430821
+salt = 2614d80275b08a1cf90bae0eb607d4d5
+info = ee991de21aeb6baa6a5f683dbb755e6f80db1c1d
+okm = e618b91d9f3d10c007958d025841a3347947eb41b23ec35a3d7927aad74f293c50405a56911d8158e74f
+
+# tcId 12: Normal
+ikm = 7a00817689a3d79001825a864c69c120
+salt = 08bc01c053a6406c7c4a667c9b9b3894
+info = 967ccd75395be6e96a67759f070487c9e2107791
+okm = bd02e16b6024f2c3b752d1c1d3047583697731915fbbb34418f479b0c9bf84a86bd8e715eca198da8f9b39b25a1229c311853f862340cdefe46ddf41dcf256d9

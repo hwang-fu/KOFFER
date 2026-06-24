@@ -58,3 +58,38 @@ pub enum KemError {
     /// during encapsulation.
     Internal,
 }
+
+/// What can go wrong during authenticated encryption (sealing or opening).
+///
+/// `OpenFailed` is the security-critical case: the authentication tag did not
+/// match, so the ciphertext or the associated data was altered (or the wrong
+/// key or nonce was used). No plaintext is ever released in that case, and every
+/// authentication failure returns this same error -- the caller is told nothing
+/// that could distinguish why opening failed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum AeadError {
+    /// Authentication failed: the tag did not match the ciphertext, associated
+    /// data, key, and nonce. No plaintext is released.
+    OpenFailed,
+    /// The supplied key bytes are not a valid AEAD key (wrong length).
+    MalformedKey,
+    /// The supplied nonce is not the size the AEAD requires.
+    MalformedNonce,
+    /// The requested algorithm is not built into this device.
+    UnsupportedAlgorithm,
+    /// An unexpected device-side failure, such as the input exceeding the
+    /// AEAD's maximum length.
+    Internal,
+}
+
+/// What can go wrong while deriving keys with a KDF.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum KdfError {
+    /// The requested output length exceeds the KDF's maximum. HKDF can produce
+    /// at most 255 times the hash length in a single call.
+    InvalidOutputLength,
+    /// The requested algorithm is not built into this device.
+    UnsupportedAlgorithm,
+}

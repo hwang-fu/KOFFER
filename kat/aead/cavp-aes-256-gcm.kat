@@ -1,0 +1,100 @@
+# AES-256-GCM (encrypt) known-answer vectors, from NIST CAVP
+# source: gcmtestvectors.zip / gcmEncryptExtIV256.rsp -- public domain (NIST)
+# selection: Keylen=256, IVlen=96, Taglen=128; a spread of PT/AAD lengths.
+# seal(key, nonce, aad, plaintext) -> ciphertext + tag; open recovers plaintext.
+
+# PTlen=0 AADlen=0 Count=0
+key = b52c505a37d78eda5dd34f20c22540ea1b58963cf8e5bf8ffa85f9f2492505b4
+nonce = 516c33929df5a3284ff463d7
+aad = 
+plaintext = 
+ciphertext = 
+tag = bdc1ac884d332457a1d2664f168c76f0
+
+# PTlen=0 AADlen=0 Count=1
+key = 5fe0861cdc2690ce69b3658c7f26f8458eec1c9243c5ba0845305d897e96ca0f
+nonce = 770ac1a5a3d476d5d96944a1
+aad = 
+plaintext = 
+ciphertext = 
+tag = 196d691e1047093ca4b3d2ef4baba216
+
+# PTlen=0 AADlen=128 Count=0
+key = 78dc4e0aaf52d935c3c01eea57428f00ca1fd475f5da86a49c8dd73d68c8e223
+nonce = d79cf22d504cc793c3fb6c8a
+aad = b96baa8c1c75a671bfb2d08d06be5f36
+plaintext = 
+ciphertext = 
+tag = 3e5d486aa2e30b22e040b85723a06e76
+
+# PTlen=0 AADlen=128 Count=1
+key = 4457ff33683cca6ca493878bdc00373893a9763412eef8cddb54f91318e0da88
+nonce = 699d1f29d7b8c55300bb1fd2
+aad = 6749daeea367d0e9809e2dc2f309e6e3
+plaintext = 
+ciphertext = 
+tag = d60c74d2517fde4a74e0cd4709ed43a9
+
+# PTlen=128 AADlen=0 Count=0
+key = 31bdadd96698c204aa9ce1448ea94ae1fb4a9a0b3c9d773b51bb1822666b8f22
+nonce = 0d18e06c7c725ac9e362e1ce
+aad = 
+plaintext = 2db5168e932556f8089a0622981d017d
+ciphertext = fa4362189661d163fcd6a56d8bf0405a
+tag = d636ac1bbedd5cc3ee727dc2ab4a9489
+
+# PTlen=128 AADlen=0 Count=1
+key = 460fc864972261c2560e1eb88761ff1c992b982497bd2ac36c04071cbb8e5d99
+nonce = 8a4a16b9e210eb68bcb6f58d
+aad = 
+plaintext = 99e4e926ffe927f691893fb79a96b067
+ciphertext = 133fc15751621b5f325c7ff71ce08324
+tag = ec4e87e0cf74a13618d0b68636ba9fa7
+
+# PTlen=128 AADlen=128 Count=0
+key = 92e11dcdaa866f5ce790fd24501f92509aacf4cb8b1339d50c9c1240935dd08b
+nonce = ac93a1a6145299bde902f21a
+aad = 1e0889016f67601c8ebea4943bc23ad6
+plaintext = 2d71bcfa914e4ac045b2aa60955fad24
+ciphertext = 8995ae2e6df3dbf96fac7b7137bae67f
+tag = eca5aa77d51d4a0a14d9c51e1da474ab
+
+# PTlen=128 AADlen=128 Count=1
+key = 7da3bccaffb3464178ca7c722379836db50ce0bfb47640b9572163865332e486
+nonce = c04fd2e701c3dc62b68738b3
+aad = fec0311013202e4ffdc4204926ae0ddf
+plaintext = fd671cab1ee21f0df6bb610bf94f0e69
+ciphertext = 6be61b17b7f7d494a7cdf270562f37ba
+tag = 5e702a38323fe1160b780d17adad3e96
+
+# PTlen=256 AADlen=160 Count=0
+key = 5853c020946b35f2c58ec427152b840420c40029636adcbb027471378cfdde0f
+nonce = eec313dd07cc1b3e6b068a47
+aad = 1389b522c24a774181700553f0246bbabdd38d6f
+plaintext = ce7458e56aef9061cb0c42ec2315565e6168f5a6249ffd31610b6d17ab64935e
+ciphertext = eadc3b8766a77ded1a58cb727eca2a9790496c298654cda78febf0da16b6903b
+tag = 3d49a5b32fde7eafcce90079217ffb57
+
+# PTlen=256 AADlen=160 Count=1
+key = 5019ac0617fea10517a2a2714e6cd369c681be340c2a24611306edcd9d5c3928
+nonce = fd1fa6b5cab9aa8d56418abb
+aad = 953bcbd731a139c5de3a2b75e9ffa4f48018266a
+plaintext = 4349221f6647a906a47e64b5a7a1deb2f7caf5c3fef16f0b968d625bca363dca
+ciphertext = dbce650508dab5f499767651ee734692f7b157341977692d2ca879799e8f54aa
+tag = 20239e97e2db4985f07e271ba545bbbf
+
+# PTlen=408 AADlen=720 Count=0
+key = 148579a3cbca86d5520d66c0ec71ca5f7e41ba78e56dc6eebd566fed547fe691
+nonce = b08a5ea1927499c6ecbfd4e0
+aad = e4f963f015ffbb99ee3349bbaf7e8e8e6c2a71c230a48f9d59860a29091d2747e01a5ca572347e247d25f56ba7ae8e05cde2be3c97931292c02370208ecd097ef692687fecf2f419d3200162a6480a57dad408a0dfeb492e2c5d
+plaintext = 9d0b15fdf1bd595f91f8b3abc0f7dec927dfd4799935a1795d9ce00c9b879434420fe42c275a7cd7b39d638fb81ca52b49dc41
+ciphertext = 2097e372950a5e9383c675e89eea1c314f999159f5611344b298cda45e62843716f215f82ee663919c64002a5c198d7878fd3f
+tag = adbecdb0d5c2224d804d2886ff9a5760
+
+# PTlen=408 AADlen=720 Count=1
+key = e49af19182faef0ebeeba9f2d3be044e77b1212358366e4ef59e008aebcd9788
+nonce = e7f37d79a6a487a5a703edbb
+aad = 19a9a1cfc647346781bef51ed9070d05f99a0e0192a223c5cd2522dbdf97d9739dd39fb178ade3339e68774b058aa03e9a20a9a205bc05f32381df4d63396ef691fefd5a71b49a2ad82d5ea428778ca47ee1398792762413cff4
+plaintext = 461cd0caf7427a3d44408d825ed719237272ecd503b9094d1f62c97d63ed83a0b50bdc804ffdd7991da7a5b6dcf48d4bcd2cbc
+ciphertext = 32ca3588e3e56eb4c8301b009d8b84b8a900b2b88ca3c21944205e9dd7311757b51394ae90d8bb3807b471677614f4198af909
+tag = 3e403d035c71d88f1be1a256c89ba6ad
