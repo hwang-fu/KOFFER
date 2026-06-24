@@ -13,6 +13,8 @@
 
 use core::marker::PhantomData;
 
+use sha2::{Sha256, Sha384};
+
 use crate::error::KdfError;
 
 /// A key-derivation backend: expand a secret plus context into output key bytes.
@@ -64,3 +66,6 @@ macro_rules! impl_backend {
         }
     };
 }
+
+impl_backend!(Sha256);
+impl_backend!(Sha384);
