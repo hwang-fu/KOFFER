@@ -96,8 +96,8 @@ impl_backend!(ml_kem::MlKem1024);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use core::convert::Infallible;
     use crate::kat::parse;
+    use core::convert::Infallible;
 
     // A deterministic CryptoRng for tests -- enough randomness for encapsulation.
     struct TestRng(u64);
