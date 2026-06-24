@@ -11,6 +11,8 @@
 //! primitive never generates one, which keeps responsibility for using a fresh
 //! nonce per key with the composition that owns the key.
 
+use crate::error::AeadError;
+
 // AES-256-GCM fixed sizes. A future ChaCha20-Poly1305 backend shares all three,
 // so these bounds are exact for every AEAD this crate plans to support.
 const KEY_LEN: usize = 32; // AES-256 key
@@ -30,4 +32,34 @@ bytes_newtype! {
 bytes_newtype! {
     /// An AEAD authentication tag, as raw bytes. 16 bytes for AES-256-GCM.
     Tag, TAG_LEN
+}
+
+/// An authenticated-encryption backend operating in place on a caller buffer.
+///
+/// `seal` encrypts the buffer and returns the tag; `open` verifies the tag and
+/// decrypts. The nonce is caller-supplied and MUST be unique per key -- reusing a
+/// nonce under one key breaks the security of GCM.
+pub trait Aead {
+    /// Encrypts `buffer` in place (plaintext -> ciphertext) and returns the
+    /// authentication tag over the ciphertext and `aad`.
+    fn seal(
+        &self,
+        key: &Key,
+        nonce: &Nonce,
+        aad: &[u8],
+        buffer: &mut [u8],
+    ) -> Result<Tag, AeadError>;
+
+    /// Verifies `tag` over `buffer` and `aad`, then decrypts `buffer` in place.
+    ///
+    /// Returns `Err(AeadError::OpenFailed)` if authentication fails, leaving the
+    /// buffer's contents unauthenticated and no plaintext trusted.
+    fn open(
+        &self,
+        key: &Key,
+        nonce: &Nonce,
+        aad: &[u8],
+        buffer: &mut [u8],
+        tag: &Tag,
+    ) -> Result<(), AeadError>;
 }
