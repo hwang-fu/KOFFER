@@ -96,6 +96,8 @@ pub mod mlkem;
 pub mod profile;
 pub mod sign;
 
+mod x25519;
+
 #[cfg(test)]
 mod kat;
 
