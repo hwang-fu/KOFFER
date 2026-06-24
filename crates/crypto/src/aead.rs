@@ -11,7 +11,8 @@
 //! primitive never generates one, which keeps responsibility for using a fresh
 //! nonce per key with the composition that owns the key.
 
-use aes_gcm::{Aes256Gcm as GcmCipher, KeyInit};
+use aes_gcm::aead::generic_array::GenericArray;
+use aes_gcm::{AeadInPlace, Aes256Gcm as GcmCipher, KeyInit};
 
 use crate::error::AeadError;
 
@@ -81,5 +82,48 @@ impl Aes256Gcm {
             .as_slice()
             .try_into()
             .map_err(|_| AeadError::MalformedNonce)
+    }
+}
+
+impl Aead for Aes256Gcm {
+    fn seal(
+        &self,
+        key: &Key,
+        nonce: &Nonce,
+        aad: &[u8],
+        buffer: &mut [u8],
+    ) -> Result<Tag, AeadError> {
+        let cipher = Self::cipher(key)?;
+        let nonce = Self::nonce_bytes(nonce)?;
+        let tag = cipher
+            .encrypt_in_place_detached(GenericArray::from_slice(&nonce), aad, buffer)
+            .map_err(|_| AeadError::Internal)?;
+        Tag::try_from(tag.as_slice()).map_err(|_| AeadError::Internal)
+    }
+
+    fn open(
+        &self,
+        key: &Key,
+        nonce: &Nonce,
+        aad: &[u8],
+        buffer: &mut [u8],
+        tag: &Tag,
+    ) -> Result<(), AeadError> {
+        let cipher = Self::cipher(key)?;
+        let nonce = Self::nonce_bytes(nonce)?;
+        // A wrong-length tag cannot authenticate, so it is reported as a plain
+        // open failure rather than a distinct error.
+        let tag: [u8; TAG_LEN] = tag
+            .as_slice()
+            .try_into()
+            .map_err(|_| AeadError::OpenFailed)?;
+        cipher
+            .decrypt_in_place_detached(
+                GenericArray::from_slice(&nonce),
+                aad,
+                buffer,
+                GenericArray::from_slice(&tag),
+            )
+            .map_err(|_| AeadError::OpenFailed)
     }
 }
