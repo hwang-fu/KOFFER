@@ -11,6 +11,8 @@
 //! `derive` writes into a caller-provided buffer, so it needs no heap and runs on
 //! the embedded target.
 
+use core::marker::PhantomData;
+
 use crate::error::KdfError;
 
 /// A key-derivation backend: expand a secret plus context into output key bytes.
@@ -22,4 +24,20 @@ pub trait Kdf {
     /// label that binds the output to its purpose. Fails only if `okm` is longer
     /// than the KDF can produce.
     fn derive(&self, salt: &[u8], ikm: &[u8], info: &[u8], okm: &mut [u8]) -> Result<(), KdfError>;
+}
+
+/// The HKDF backend over hash `H`: `Sha256` (showcase) or `Sha384` (CNSA 2.0).
+pub struct Hkdf<H>(PhantomData<H>);
+
+impl<H> Hkdf<H> {
+    /// Creates the backend.
+    pub const fn new() -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl<H> Default for Hkdf<H> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
