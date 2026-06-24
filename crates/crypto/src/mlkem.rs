@@ -97,6 +97,7 @@ impl_backend!(ml_kem::MlKem1024);
 mod tests {
     use super::*;
     use core::convert::Infallible;
+    use crate::kat::parse;
 
     // A deterministic CryptoRng for tests -- enough randomness for encapsulation.
     struct TestRng(u64);
@@ -166,5 +167,36 @@ mod tests {
         ml_kem::MlKem1024,
         mlkem1024_round_trips,
         mlkem1024_implicit_rejection
+    );
+
+    // keyGen (seed -> public key) and decapsulation (seed + ciphertext -> shared secret),
+    // replayed against the Wycheproof vectors.
+    macro_rules! kat_tests {
+        ($param:ty, $name:ident, $vectors:expr) => {
+            #[test]
+            fn $name() {
+                let backend = MlKem::<$param>::new();
+                let records = parse($vectors).unwrap();
+                assert!(!records.is_empty());
+                for r in &records {
+                    let (ek, dk) = backend.keygen(r.field("seed").unwrap()).unwrap();
+                    assert_eq!(ek.as_slice(), r.field("public_key").unwrap());
+                    let ct = Ciphertext::try_from(r.field("ciphertext").unwrap()).unwrap();
+                    let shared = backend.decapsulate(&dk, &ct).unwrap();
+                    assert_eq!(shared.as_slice(), r.field("shared_secret").unwrap());
+                }
+            }
+        };
+    }
+
+    kat_tests!(
+        ml_kem::MlKem768,
+        mlkem768_wycheproof_kat,
+        include_str!("../../../kat/mlkem/wycheproof-768.kat")
+    );
+    kat_tests!(
+        ml_kem::MlKem1024,
+        mlkem1024_wycheproof_kat,
+        include_str!("../../../kat/mlkem/wycheproof-1024.kat")
     );
 }
