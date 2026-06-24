@@ -26,3 +26,23 @@ pub(crate) fn dh(secret: &[u8; 32], peer_public: &[u8; 32]) -> [u8; 32] {
     let peer = PublicKey::from(*peer_public);
     secret.diffie_hellman(&peer).to_bytes()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn two_parties_agree() {
+        let (a_secret, a_public) = keypair_from_entropy(&[0x11; 32]);
+        let (b_secret, b_public) = keypair_from_entropy(&[0x22; 32]);
+        // Each side combines its own secret with the peer's public key.
+        assert_eq!(dh(&a_secret, &b_public), dh(&b_secret, &a_public));
+    }
+
+    #[test]
+    fn distinct_entropy_yields_distinct_keys() {
+        let (_, a_public) = keypair_from_entropy(&[0x11; 32]);
+        let (_, b_public) = keypair_from_entropy(&[0x22; 32]);
+        assert_ne!(a_public, b_public);
+    }
+}
