@@ -92,3 +92,71 @@ macro_rules! impl_backend {
 
 impl_backend!(ml_kem::MlKem768);
 impl_backend!(ml_kem::MlKem1024);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use core::convert::Infallible;
+
+    // A deterministic CryptoRng for tests -- enough randomness for encapsulation.
+    struct TestRng(u64);
+
+    impl rand_core::TryRng for TestRng {
+        type Error = Infallible;
+        fn try_next_u32(&mut self) -> Result<u32, Infallible> {
+            Ok(self.try_next_u64()? as u32)
+        }
+        fn try_next_u64(&mut self) -> Result<u64, Infallible> {
+            self.0 = self.0.wrapping_add(1);
+            Ok(self.0)
+        }
+        fn try_fill_bytes(&mut self, dst: &mut [u8]) -> Result<(), Infallible> {
+            for chunk in dst.chunks_mut(8) {
+                let value = self.try_next_u64()?.to_le_bytes();
+                chunk.copy_from_slice(&value[..chunk.len()]);
+            }
+            Ok(())
+        }
+    }
+    impl rand_core::TryCryptoRng for TestRng {}
+
+    // The backend impls are concrete per parameter set (private `KemParams`), so a generic
+    // test helper cannot call `keygen`; generate the tests per parameter set instead.
+    macro_rules! backend_tests {
+        ($param:ty, $round_trip:ident, $implicit_rejection:ident) => {
+            #[test]
+            fn $round_trip() {
+                let backend = MlKem::<$param>::new();
+                let (ek, dk) = backend.keygen(&[0x42u8; 64]).unwrap();
+                let (ciphertext, sent) = backend.encapsulate(&ek, &mut TestRng(1)).unwrap();
+                let recovered = backend.decapsulate(&dk, &ciphertext).unwrap();
+                assert_eq!(sent.as_slice(), recovered.as_slice());
+            }
+
+            #[test]
+            fn $implicit_rejection() {
+                let backend = MlKem::<$param>::new();
+                let (ek, dk) = backend.keygen(&[0x42u8; 64]).unwrap();
+                let (ciphertext, sent) = backend.encapsulate(&ek, &mut TestRng(1)).unwrap();
+
+                // Flip a byte well inside the ciphertext -- still the right length.
+                let mut bytes = ciphertext.as_slice().to_vec();
+                let mid = bytes.len() / 2;
+                bytes[mid] ^= 0x01;
+                let tampered = Ciphertext::try_from(bytes.as_slice()).unwrap();
+
+                // Implicit rejection: no error, a pseudorandom secret distinct from the real
+                // one, and deterministic (same tampered ciphertext -> same secret).
+                let rejected = backend.decapsulate(&dk, &tampered).unwrap();
+                assert_ne!(rejected.as_slice(), sent.as_slice());
+                assert_eq!(
+                    rejected.as_slice(),
+                    backend.decapsulate(&dk, &tampered).unwrap().as_slice()
+                );
+            }
+        };
+    }
+
+    backend_tests!(ml_kem::MlKem768, mlkem768_round_trips, mlkem768_implicit_rejection);
+    backend_tests!(ml_kem::MlKem1024, mlkem1024_round_trips, mlkem1024_implicit_rejection);
+}
