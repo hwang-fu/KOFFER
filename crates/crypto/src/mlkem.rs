@@ -157,6 +157,14 @@ mod tests {
         };
     }
 
-    backend_tests!(ml_kem::MlKem768, mlkem768_round_trips, mlkem768_implicit_rejection);
-    backend_tests!(ml_kem::MlKem1024, mlkem1024_round_trips, mlkem1024_implicit_rejection);
+    backend_tests!(
+        ml_kem::MlKem768,
+        mlkem768_round_trips,
+        mlkem768_implicit_rejection
+    );
+    backend_tests!(
+        ml_kem::MlKem1024,
+        mlkem1024_round_trips,
+        mlkem1024_implicit_rejection
+    );
 }
