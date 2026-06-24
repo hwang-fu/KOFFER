@@ -69,3 +69,36 @@ macro_rules! impl_backend {
 
 impl_backend!(Sha256);
 impl_backend!(Sha384);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::kat::{assert_field, parse};
+
+    const RFC5869: &str = include_str!("../../../kat/kdf/rfc5869-hkdf-sha256.kat");
+    const WYCHEPROOF_384: &str = include_str!("../../../kat/kdf/wycheproof-hkdf-sha384.kat");
+
+    fn check_vectors<K: Kdf>(backend: &K, vectors: &str) {
+        let records = parse(vectors).unwrap();
+        for record in &records {
+            let salt = record.field("salt").unwrap();
+            let ikm = record.field("ikm").unwrap();
+            let info = record.field("info").unwrap();
+            let expected = record.field("okm").unwrap();
+
+            let mut okm = vec![0u8; expected.len()];
+            backend.derive(salt, ikm, info, &mut okm).unwrap();
+            assert_field(record, "okm", &okm);
+        }
+    }
+
+    #[test]
+    fn rfc5869_hkdf_sha256_vectors() {
+        check_vectors(&Hkdf::<Sha256>::new(), RFC5869);
+    }
+
+    #[test]
+    fn wycheproof_hkdf_sha384_vectors() {
+        check_vectors(&Hkdf::<Sha384>::new(), WYCHEPROOF_384);
+    }
+}
