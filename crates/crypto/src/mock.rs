@@ -2,11 +2,13 @@
 //! proving the trait seam composes end to end before any real scheme exists.
 //! The whole module is test-only.
 
+use core::convert::Infallible;
+
 use crate::error::{KemError, SignError, VerifyError};
 use crate::kem::{Ciphertext, DecapsulationKey, EncapsulationKey, Kem, SharedSecret};
 use crate::profile::CryptoProfile;
 use crate::sign::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
-use rand_core::{CryptoRng, RngCore};
+use rand_core::{TryCryptoRng, TryRng};
 
 /// A stand-in backend: no real cryptography, just enough for a roundtrip.
 struct Mock;
@@ -37,7 +39,7 @@ impl Kem for Mock {
     fn encapsulate(
         &self,
         _key: &EncapsulationKey,
-        rng: &mut dyn rand_core::CryptoRngCore,
+        rng: &mut dyn rand_core::CryptoRng,
     ) -> Result<(Ciphertext, SharedSecret), KemError> {
         // Draw the shared secret from the RNG and carry it verbatim in the
         // ciphertext, so `decapsulate` recovers it.
@@ -57,33 +59,31 @@ impl Kem for Mock {
     }
 }
 
-/// A deterministic counter RNG -- enough to satisfy `CryptoRngCore` in tests.
-struct CountingRng(u64);
+/// A deterministic counter RNG -- enough to satisfy `CryptoRng` in tests.
+struct CounterRng(u64);
 
-impl RngCore for CountingRng {
-    fn next_u32(&mut self) -> u32 {
-        self.next_u64() as u32
+impl TryRng for CounterRng {
+    type Error = Infallible;
+
+    fn try_next_u32(&mut self) -> Result<u32, Infallible> {
+        Ok(self.try_next_u64()? as u32)
     }
 
-    fn next_u64(&mut self) -> u64 {
+    fn try_next_u64(&mut self) -> Result<u64, Infallible> {
         self.0 = self.0.wrapping_add(1);
-        self.0
+        Ok(self.0)
     }
 
-    fn fill_bytes(&mut self, dest: &mut [u8]) {
-        for chunk in dest.chunks_mut(8) {
-            let value = self.next_u64().to_le_bytes();
+    fn try_fill_bytes(&mut self, dst: &mut [u8]) -> Result<(), Infallible> {
+        for chunk in dst.chunks_mut(8) {
+            let value = self.try_next_u64()?.to_le_bytes();
             chunk.copy_from_slice(&value[..chunk.len()]);
         }
-    }
-
-    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
-        self.fill_bytes(dest);
         Ok(())
     }
 }
 
-impl CryptoRng for CountingRng {}
+impl TryCryptoRng for CounterRng {}
 
 #[test]
 fn seam_composes_end_to_end() {
@@ -108,7 +108,7 @@ fn seam_composes_end_to_end() {
     );
 
     // Encapsulate / decapsulate: both sides agree on the shared secret.
-    let mut rng = CountingRng(0);
+    let mut rng = CounterRng(0);
     let ek = EncapsulationKey::try_from(&[0u8; 4][..]).unwrap();
     let dk = DecapsulationKey::try_from(&[0u8; 4][..]).unwrap();
     let (ciphertext, secret) = backend.encapsulate(&ek, &mut rng).unwrap();

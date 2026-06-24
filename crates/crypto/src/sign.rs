@@ -12,17 +12,17 @@ const VERIFYING_KEY_MAX: usize = 2592; // ML-DSA-87 public key
 // w=8, SHA-256) is about 2964 bytes -- comfortably under this.
 const SIGNATURE_MAX: usize = 4627; // ML-DSA-87 signature
 
-secret_byte_value! {
+secret_bytes_newtype! {
     /// A secret signing key, as raw bytes.
     SigningKey, SIGNING_KEY_MAX
 }
 
-byte_value! {
+bytes_newtype! {
     /// A public verifying key, as raw bytes.
     VerifyingKey, VERIFYING_KEY_MAX
 }
 
-byte_value! {
+bytes_newtype! {
     /// A signature, as raw bytes.
     Signature, SIGNATURE_MAX
 }
