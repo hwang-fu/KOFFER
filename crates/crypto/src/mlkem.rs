@@ -89,3 +89,6 @@ macro_rules! impl_backend {
         }
     };
 }
+
+impl_backend!(ml_kem::MlKem768);
+impl_backend!(ml_kem::MlKem1024);
