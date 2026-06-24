@@ -11,6 +11,8 @@
 //! primitive never generates one, which keeps responsibility for using a fresh
 //! nonce per key with the composition that owns the key.
 
+use aes_gcm::{Aes256Gcm as GcmCipher, KeyInit};
+
 use crate::error::AeadError;
 
 // AES-256-GCM fixed sizes. A future ChaCha20-Poly1305 backend shares all three,
@@ -62,4 +64,22 @@ pub trait Aead {
         buffer: &mut [u8],
         tag: &Tag,
     ) -> Result<(), AeadError>;
+}
+
+/// The AES-256-GCM AEAD backend.
+pub struct Aes256Gcm;
+
+impl Aes256Gcm {
+    /// Loads the cipher from a key, mapping a wrong-length key to `MalformedKey`.
+    fn cipher(key: &Key) -> Result<GcmCipher, AeadError> {
+        GcmCipher::new_from_slice(key.as_slice()).map_err(|_| AeadError::MalformedKey)
+    }
+
+    /// Validates the nonce length and copies it into a fixed array.
+    fn nonce_bytes(nonce: &Nonce) -> Result<[u8; NONCE_LEN], AeadError> {
+        nonce
+            .as_slice()
+            .try_into()
+            .map_err(|_| AeadError::MalformedNonce)
+    }
 }
