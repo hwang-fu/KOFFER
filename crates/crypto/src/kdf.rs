@@ -10,3 +10,16 @@
 //! `Sha384` for the CNSA 2.0 profile -- mirroring the LMS backend's `Lms<H>`.
 //! `derive` writes into a caller-provided buffer, so it needs no heap and runs on
 //! the embedded target.
+
+use crate::error::KdfError;
+
+/// A key-derivation backend: expand a secret plus context into output key bytes.
+pub trait Kdf {
+    /// Derives `okm.len()` bytes of output keying material into `okm`.
+    ///
+    /// `salt` is optional non-secret randomness (an empty slice means "no salt"),
+    /// `ikm` is the input keying material (the secret), and `info` is a context
+    /// label that binds the output to its purpose. Fails only if `okm` is longer
+    /// than the KDF can produce.
+    fn derive(&self, salt: &[u8], ikm: &[u8], info: &[u8], okm: &mut [u8]) -> Result<(), KdfError>;
+}
