@@ -82,3 +82,14 @@ pub enum AeadError {
     /// AEAD's maximum length.
     Internal,
 }
+
+/// What can go wrong while deriving keys with a KDF.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum KdfError {
+    /// The requested output length exceeds the KDF's maximum. HKDF can produce
+    /// at most 255 times the hash length in a single call.
+    InvalidOutputLength,
+    /// The requested algorithm is not built into this device.
+    UnsupportedAlgorithm,
+}
