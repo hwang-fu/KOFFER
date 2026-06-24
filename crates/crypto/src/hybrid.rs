@@ -47,3 +47,47 @@ fn combine<K: Kdf>(
     okm.zeroize();
     combined
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::kdf::Hkdf;
+    use sha2::Sha256;
+
+    const SS_MLKEM: [u8; 32] = [0x01; 32];
+    const SS_X25519: [u8; 32] = [0x02; 32];
+    const CIPHERTEXT: [u8; 64] = [0x03; 64];
+
+    #[test]
+    fn combine_is_deterministic() {
+        let kdf = Hkdf::<Sha256>::new();
+        let a = combine(&kdf, LABEL_768, &SS_MLKEM, &SS_X25519, &CIPHERTEXT).unwrap();
+        let b = combine(&kdf, LABEL_768, &SS_MLKEM, &SS_X25519, &CIPHERTEXT).unwrap();
+        assert_eq!(a.as_slice(), b.as_slice());
+    }
+
+    #[test]
+    fn combine_binds_every_input() {
+        let kdf = Hkdf::<Sha256>::new();
+        let base = combine(&kdf, LABEL_768, &SS_MLKEM, &SS_X25519, &CIPHERTEXT).unwrap();
+
+        // Each input -- both secrets, the transcript, and the label -- changes the output.
+        let mut ss_mlkem = SS_MLKEM;
+        ss_mlkem[0] ^= 1;
+        let a = combine(&kdf, LABEL_768, &ss_mlkem, &SS_X25519, &CIPHERTEXT).unwrap();
+        assert_ne!(a.as_slice(), base.as_slice());
+
+        let mut ss_x25519 = SS_X25519;
+        ss_x25519[0] ^= 1;
+        let b = combine(&kdf, LABEL_768, &SS_MLKEM, &ss_x25519, &CIPHERTEXT).unwrap();
+        assert_ne!(b.as_slice(), base.as_slice());
+
+        let mut ciphertext = CIPHERTEXT;
+        ciphertext[0] ^= 1;
+        let c = combine(&kdf, LABEL_768, &SS_MLKEM, &SS_X25519, &ciphertext).unwrap();
+        assert_ne!(c.as_slice(), base.as_slice());
+
+        let d = combine(&kdf, LABEL_1024, &SS_MLKEM, &SS_X25519, &CIPHERTEXT).unwrap();
+        assert_ne!(d.as_slice(), base.as_slice());
+    }
+}
