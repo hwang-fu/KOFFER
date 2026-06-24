@@ -75,9 +75,20 @@ macro_rules! impl_backend {
                 key: &DecapsulationKey,
                 ciphertext: &Ciphertext,
             ) -> Result<SharedSecret, KemError> {
-                // The decapsulation key is its 64-byte seed; re-derive it each call. ML-KEM
-                // decapsulation is constant-time and implicitly rejecting -- a well-formed but
-                // invalid ciphertext yields a pseudorandom secret, never an error.
+                // Constant-time, implicitly-rejecting decapsulation -- the secret-key path, so
+                // its timing must not depend on secret data. `ml-kem` provides the guarantee via
+                // `module-lattice`'s CT utilities: FIPS 203's re-encrypt-and-compare uses a
+                // constant-time equality (`ct_eq`), and the choice between the real shared secret
+                // and the pseudorandom rejection secret is a branchless `ct_select`, not an `if`.
+                // So an invalid (well-formed) ciphertext takes the same steps in the same time
+                // and returns a pseudorandom secret -- never an error, no distinguishing leak.
+                //
+                // Our wrapper adds no secret-dependent branch, index, or early return: the one
+                // branch (wrong-length ciphertext -> `MalformedCiphertext`) tests the public
+                // length, not the bytes. Re-deriving the key from the seed adds no secret-dependent
+                // timing either -- its only variable-time step, sampling the matrix `A`, is keyed
+                // on the public `rho`, which FIPS 203 decapsulation re-samples regardless.
+                // Empirical timing is measured separately.
                 let seed =
                     ml_kem::Seed::try_from(key.as_slice()).map_err(|_| KemError::MalformedKey)?;
                 let decapsulation_key = ml_kem::DecapsulationKey::<$param>::from_seed(seed);
