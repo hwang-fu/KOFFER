@@ -48,6 +48,30 @@ fn combine<K: Kdf>(
     combined
 }
 
+// Stack-buffer capacity for assembling a concatenated value: the biggest hybrid
+// key or ciphertext (the ML-KEM-1024 part plus the 32-byte X25519 part).
+const JOIN_MAX: usize = 1600;
+
+/// Splits hybrid bytes into the ML-KEM part (all but the last 32 bytes) and the
+/// 32-byte X25519 part. `None` if there are fewer than 32 bytes.
+fn split_last_32(bytes: &[u8]) -> Option<(&[u8], [u8; 32])> {
+    let n = bytes.len().checked_sub(32)?;
+    let tail: [u8; 32] = bytes[n..].try_into().ok()?;
+    Some((&bytes[..n], tail))
+}
+
+/// Concatenates `head || tail` into `buf`, returning the filled slice (or
+/// `Internal` if the buffer is too small).
+fn join<'b>(buf: &'b mut [u8], head: &[u8], tail: &[u8; 32]) -> Result<&'b [u8], KemError> {
+    let n = head.len() + tail.len();
+    {
+        let out = buf.get_mut(..n).ok_or(KemError::Internal)?;
+        out[..head.len()].copy_from_slice(head);
+        out[head.len()..].copy_from_slice(tail);
+    }
+    Ok(&buf[..n])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
