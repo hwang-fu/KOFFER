@@ -9,3 +9,20 @@
 //! Secrets are built from caller-supplied entropy via `StaticSecret::from`, so this
 //! module never uses `x25519-dalek`'s own RNG (which is a different `rand_core`
 //! major); the hybrid supplies the random bytes.
+
+use x25519_dalek::{PublicKey, StaticSecret};
+
+/// Derives an X25519 keypair from 32 bytes of entropy, returning (secret, public).
+pub(crate) fn keypair_from_entropy(entropy: &[u8; 32]) -> ([u8; 32], [u8; 32]) {
+    let secret = StaticSecret::from(*entropy);
+    let public = PublicKey::from(&secret);
+    (secret.to_bytes(), public.to_bytes())
+}
+
+/// X25519 Diffie-Hellman: combines our `secret` with a `peer_public` key to reach
+/// the shared secret both sides agree on.
+pub(crate) fn dh(secret: &[u8; 32], peer_public: &[u8; 32]) -> [u8; 32] {
+    let secret = StaticSecret::from(*secret);
+    let peer = PublicKey::from(*peer_public);
+    secret.diffie_hellman(&peer).to_bytes()
+}
