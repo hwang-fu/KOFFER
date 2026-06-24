@@ -41,3 +41,26 @@ impl<H> Default for Hkdf<H> {
         Self::new()
     }
 }
+
+/// Generates a concrete `Kdf` impl for `Hkdf<$hash>`. One impl per hash: the
+/// useful `hkdf` bound is sealed, so a single generic impl is not nameable here.
+macro_rules! impl_backend {
+    ($hash:ty) => {
+        impl Kdf for Hkdf<$hash> {
+            fn derive(
+                &self,
+                salt: &[u8],
+                ikm: &[u8],
+                info: &[u8],
+                okm: &mut [u8],
+            ) -> Result<(), KdfError> {
+                // RFC 5869: an empty salt means "no salt" -- HKDF then uses a
+                // string of hash-length zero bytes in its place.
+                let salt = if salt.is_empty() { None } else { Some(salt) };
+                let hkdf = hkdf::Hkdf::<$hash>::new(salt, ikm);
+                hkdf.expand(info, okm)
+                    .map_err(|_| KdfError::InvalidOutputLength)
+            }
+        }
+    };
+}
