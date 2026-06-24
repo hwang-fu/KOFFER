@@ -196,7 +196,10 @@ impl_backend!(X25519MlKem1024, MlKem1024, Sha384, LABEL_1024);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::kat::{assert_field, parse};
     use crate::kdf::Hkdf;
+    use core::convert::Infallible;
+    use rand_core::{TryCryptoRng, TryRng};
     use sha2::Sha256;
 
     const SS_MLKEM: [u8; 32] = [0x01; 32];
@@ -235,4 +238,59 @@ mod tests {
         let d = combine(&kdf, LABEL_1024, &SS_MLKEM, &SS_X25519, &CIPHERTEXT).unwrap();
         assert_ne!(d.as_slice(), base.as_slice());
     }
+
+    const KAT_768: &str = include_str!("../../../kat/hybrid/self-consistency-768.kat");
+    const KAT_1024: &str = include_str!("../../../kat/hybrid/self-consistency-1024.kat");
+
+    /// Deterministic counter RNG, so encapsulation reproduces the frozen vector.
+    struct TestRng(u64);
+
+    impl TryRng for TestRng {
+        type Error = Infallible;
+        fn try_next_u32(&mut self) -> Result<u32, Infallible> {
+            Ok(self.try_next_u64()? as u32)
+        }
+        fn try_next_u64(&mut self) -> Result<u64, Infallible> {
+            self.0 = self.0.wrapping_add(1);
+            Ok(self.0)
+        }
+        fn try_fill_bytes(&mut self, dst: &mut [u8]) -> Result<(), Infallible> {
+            for chunk in dst.chunks_mut(8) {
+                let value = self.try_next_u64()?.to_le_bytes();
+                chunk.copy_from_slice(&value[..chunk.len()]);
+            }
+            Ok(())
+        }
+    }
+    impl TryCryptoRng for TestRng {}
+
+    macro_rules! self_consistency_test {
+        ($name:ident, $backend:expr, $kat:expr) => {
+            #[test]
+            fn $name() {
+                let records = parse($kat).unwrap();
+                let record = &records[0];
+                let backend = $backend;
+
+                // keygen reproduces the frozen keypair.
+                let entropy = record.field("entropy").unwrap();
+                let (ek, dk) = backend.keygen(entropy).unwrap();
+                assert_field(record, "encapsulation_key", ek.as_slice());
+                assert_field(record, "decapsulation_key", dk.as_slice());
+
+                // encapsulate (fixed RNG) reproduces the frozen ciphertext + secret.
+                let mut rng = TestRng(0);
+                let (ct, ss) = backend.encapsulate(&ek, &mut rng).unwrap();
+                assert_field(record, "ciphertext", ct.as_slice());
+                assert_field(record, "shared_secret", ss.as_slice());
+
+                // decapsulate recovers that same secret (roundtrip inside the vector).
+                let recovered = backend.decapsulate(&dk, &ct).unwrap();
+                assert_field(record, "shared_secret", recovered.as_slice());
+            }
+        };
+    }
+
+    self_consistency_test!(self_consistency_768, X25519MlKem768, KAT_768);
+    self_consistency_test!(self_consistency_1024, X25519MlKem1024, KAT_1024);
 }
