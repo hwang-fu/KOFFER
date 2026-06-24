@@ -319,4 +319,42 @@ mod tests {
 
     roundtrip_proptest!(hybrid_768_roundtrip, X25519MlKem768);
     roundtrip_proptest!(hybrid_1024_roundtrip, X25519MlKem1024);
+
+    // Corrupting either component of the ciphertext changes the decapsulated
+    // secret (binding). Neither corruption errors -- X25519 DH always returns a
+    // value and ML-KEM uses implicit rejection -- but the combined secret differs.
+    macro_rules! binding_test {
+        ($name:ident, $backend:expr) => {
+            #[test]
+            fn $name() {
+                let backend = $backend;
+                let entropy = [0x07u8; 96];
+                let (ek, dk) = backend.keygen(&entropy).unwrap();
+                let mut rng = TestRng(0);
+                let (ct, ss) = backend.encapsulate(&ek, &mut rng).unwrap();
+
+                // Baseline: the untouched ciphertext recovers the secret.
+                let recovered = backend.decapsulate(&dk, &ct).unwrap();
+                assert_eq!(recovered.as_slice(), ss.as_slice());
+
+                // Corrupt the X25519 part (the last 32 bytes).
+                let mut bytes = ct.as_slice().to_vec();
+                let last = bytes.len() - 1;
+                bytes[last] ^= 0x01;
+                let tampered = Ciphertext::try_from(bytes.as_slice()).unwrap();
+                let recovered = backend.decapsulate(&dk, &tampered).unwrap();
+                assert_ne!(recovered.as_slice(), ss.as_slice());
+
+                // Corrupt the ML-KEM part (a byte at the front).
+                let mut bytes = ct.as_slice().to_vec();
+                bytes[0] ^= 0x01;
+                let tampered = Ciphertext::try_from(bytes.as_slice()).unwrap();
+                let recovered = backend.decapsulate(&dk, &tampered).unwrap();
+                assert_ne!(recovered.as_slice(), ss.as_slice());
+            }
+        };
+    }
+
+    binding_test!(hybrid_768_binding, X25519MlKem768);
+    binding_test!(hybrid_1024_binding, X25519MlKem1024);
 }
