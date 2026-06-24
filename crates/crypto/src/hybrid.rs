@@ -199,6 +199,7 @@ mod tests {
     use crate::kat::{assert_field, parse};
     use crate::kdf::Hkdf;
     use core::convert::Infallible;
+    use proptest::prelude::*;
     use rand_core::{TryCryptoRng, TryRng};
     use sha2::Sha256;
 
@@ -293,4 +294,29 @@ mod tests {
 
     self_consistency_test!(self_consistency_768, X25519MlKem768, KAT_768);
     self_consistency_test!(self_consistency_1024, X25519MlKem1024, KAT_1024);
+
+    // encapsulate -> decapsulate recovers the same shared secret, over random
+    // keypairs and random encapsulation randomness.
+    macro_rules! roundtrip_proptest {
+        ($name:ident, $backend:expr) => {
+            proptest! {
+                #![proptest_config(ProptestConfig { cases: 64, ..ProptestConfig::default() })]
+                #[test]
+                fn $name(
+                    entropy in prop::collection::vec(any::<u8>(), 96),
+                    seed in any::<u64>(),
+                ) {
+                    let backend = $backend;
+                    let (ek, dk) = backend.keygen(&entropy).unwrap();
+                    let mut rng = TestRng(seed);
+                    let (ct, ss) = backend.encapsulate(&ek, &mut rng).unwrap();
+                    let recovered = backend.decapsulate(&dk, &ct).unwrap();
+                    prop_assert_eq!(ss.as_slice(), recovered.as_slice());
+                }
+            }
+        };
+    }
+
+    roundtrip_proptest!(hybrid_768_roundtrip, X25519MlKem768);
+    roundtrip_proptest!(hybrid_1024_roundtrip, X25519MlKem1024);
 }
