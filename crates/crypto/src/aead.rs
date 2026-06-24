@@ -127,3 +127,34 @@ impl Aead for Aes256Gcm {
             .map_err(|_| AeadError::OpenFailed)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::kat::{assert_field, parse};
+
+    const CAVP: &str = include_str!("../../../kat/aead/cavp-aes-256-gcm.kat");
+
+    #[test]
+    fn cavp_aes_256_gcm_vectors() {
+        let records = parse(CAVP).unwrap();
+        let backend = Aes256Gcm;
+        for record in &records {
+            let key = Key::try_from(record.field("key").unwrap()).unwrap();
+            let nonce = Nonce::try_from(record.field("nonce").unwrap()).unwrap();
+            let aad = record.field("aad").unwrap();
+            let plaintext = record.field("plaintext").unwrap();
+
+            // seal: encrypt in place, then check the ciphertext and tag match.
+            let mut buffer = plaintext.to_vec();
+            let tag = backend.seal(&key, &nonce, aad, &mut buffer).unwrap();
+            assert_field(record, "ciphertext", &buffer);
+            assert_field(record, "tag", tag.as_slice());
+
+            // open: verify against the published tag and decrypt back in place.
+            let tag = Tag::try_from(record.field("tag").unwrap()).unwrap();
+            backend.open(&key, &nonce, aad, &mut buffer, &tag).unwrap();
+            assert_eq!(buffer.as_slice(), plaintext);
+        }
+    }
+}
