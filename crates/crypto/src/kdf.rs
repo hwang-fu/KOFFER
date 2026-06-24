@@ -101,4 +101,53 @@ mod tests {
     fn wycheproof_hkdf_sha384_vectors() {
         check_vectors(&Hkdf::<Sha384>::new(), WYCHEPROOF_384);
     }
+
+    #[test]
+    fn derive_length_is_a_prefix() {
+        // HKDF expands a stream and truncates, so a shorter output is a prefix
+        // of a longer one derived from the same inputs.
+        let backend = Hkdf::<Sha256>::new();
+        let mut short = [0u8; 16];
+        let mut long = [0u8; 64];
+        backend
+            .derive(b"salt", b"ikm", b"info", &mut short)
+            .unwrap();
+        backend.derive(b"salt", b"ikm", b"info", &mut long).unwrap();
+        assert_eq!(&long[..16], &short[..]);
+    }
+
+    #[test]
+    fn different_info_diverges() {
+        let backend = Hkdf::<Sha256>::new();
+        let mut a = [0u8; 32];
+        let mut b = [0u8; 32];
+        backend
+            .derive(b"salt", b"ikm", b"context-a", &mut a)
+            .unwrap();
+        backend
+            .derive(b"salt", b"ikm", b"context-b", &mut b)
+            .unwrap();
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn different_salt_diverges() {
+        let backend = Hkdf::<Sha256>::new();
+        let mut a = [0u8; 32];
+        let mut b = [0u8; 32];
+        backend.derive(b"salt-a", b"ikm", b"info", &mut a).unwrap();
+        backend.derive(b"salt-b", b"ikm", b"info", &mut b).unwrap();
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn exceeds_max_output_length_errors() {
+        // HKDF caps output at 255 * hash_len; for SHA-256 that is 255 * 32 bytes.
+        let backend = Hkdf::<Sha256>::new();
+        let mut okm = vec![0u8; 255 * 32 + 1];
+        assert_eq!(
+            backend.derive(b"salt", b"ikm", b"info", &mut okm),
+            Err(KdfError::InvalidOutputLength)
+        );
+    }
 }
