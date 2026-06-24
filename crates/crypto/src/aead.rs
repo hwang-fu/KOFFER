@@ -132,6 +132,7 @@ impl Aead for Aes256Gcm {
 mod tests {
     use super::*;
     use crate::kat::{assert_field, parse};
+    use proptest::prelude::*;
 
     const CAVP: &str = include_str!("../../../kat/aead/cavp-aes-256-gcm.kat");
 
@@ -156,5 +157,89 @@ mod tests {
             backend.open(&key, &nonce, aad, &mut buffer, &tag).unwrap();
             assert_eq!(buffer.as_slice(), plaintext);
         }
+    }
+
+    // seal -> open recovers the plaintext for arbitrary key, nonce, AAD, and message.
+    proptest! {
+        #[test]
+        fn seal_open_roundtrip(
+            key in prop::array::uniform32(any::<u8>()),
+            nonce in prop::array::uniform12(any::<u8>()),
+            aad in prop::collection::vec(any::<u8>(), 0..64),
+            plaintext in prop::collection::vec(any::<u8>(), 0..256),
+        ) {
+            let backend = Aes256Gcm;
+            let key = Key::try_from(&key[..]).unwrap();
+            let nonce = Nonce::try_from(&nonce[..]).unwrap();
+
+            let mut buffer = plaintext.clone();
+            let tag = backend.seal(&key, &nonce, &aad, &mut buffer).unwrap();
+            backend.open(&key, &nonce, &aad, &mut buffer, &tag).unwrap();
+            prop_assert_eq!(buffer, plaintext);
+        }
+    }
+
+    /// Seals a fixed message and returns the parts, for the tamper tests.
+    fn sealed() -> (Aes256Gcm, Key, Nonce, &'static [u8], Vec<u8>, Tag) {
+        let backend = Aes256Gcm;
+        let key = Key::try_from(&[0x11u8; 32][..]).unwrap();
+        let nonce = Nonce::try_from(&[0x22u8; 12][..]).unwrap();
+        let aad: &[u8] = b"header";
+        let mut buffer = b"secret payload".to_vec();
+        let tag = backend.seal(&key, &nonce, aad, &mut buffer).unwrap();
+        (backend, key, nonce, aad, buffer, tag)
+    }
+
+    #[test]
+    fn open_rejects_tampered_ciphertext() {
+        let (backend, key, nonce, aad, mut buffer, tag) = sealed();
+        buffer[0] ^= 0x01;
+        assert_eq!(
+            backend.open(&key, &nonce, aad, &mut buffer, &tag),
+            Err(AeadError::OpenFailed)
+        );
+    }
+
+    #[test]
+    fn open_rejects_tampered_tag() {
+        let (backend, key, nonce, aad, mut buffer, tag) = sealed();
+        let mut bytes = tag.as_slice().to_vec();
+        bytes[0] ^= 0x01;
+        let tag = Tag::try_from(&bytes[..]).unwrap();
+        assert_eq!(
+            backend.open(&key, &nonce, aad, &mut buffer, &tag),
+            Err(AeadError::OpenFailed)
+        );
+    }
+
+    #[test]
+    fn open_rejects_tampered_aad() {
+        let (backend, key, nonce, _aad, mut buffer, tag) = sealed();
+        assert_eq!(
+            backend.open(&key, &nonce, b"HEADER", &mut buffer, &tag),
+            Err(AeadError::OpenFailed)
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_key_and_nonce() {
+        let backend = Aes256Gcm;
+        let nonce = Nonce::try_from(&[0u8; 12][..]).unwrap();
+        let mut buffer = [0u8; 4];
+
+        // A 16-byte value is a valid `Key` newtype but not a valid AES-256 key.
+        let short_key = Key::try_from(&[0u8; 16][..]).unwrap();
+        assert_eq!(
+            backend.seal(&short_key, &nonce, &[], &mut buffer),
+            Err(AeadError::MalformedKey)
+        );
+
+        // An 8-byte nonce is a valid `Nonce` newtype but not a 96-bit GCM nonce.
+        let key = Key::try_from(&[0u8; 32][..]).unwrap();
+        let short_nonce = Nonce::try_from(&[0u8; 8][..]).unwrap();
+        assert_eq!(
+            backend.seal(&key, &short_nonce, &[], &mut buffer),
+            Err(AeadError::MalformedNonce)
+        );
     }
 }
