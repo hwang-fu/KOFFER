@@ -98,6 +98,7 @@ mod tests {
     use super::*;
     use crate::kat::parse;
     use core::convert::Infallible;
+    use proptest::prelude::*;
 
     // A deterministic CryptoRng for tests -- enough randomness for encapsulation.
     struct TestRng(u64);
@@ -199,4 +200,23 @@ mod tests {
         mlkem1024_wycheproof_kat,
         include_str!("../../../kat/mlkem/wycheproof-1024.kat")
     );
+
+    macro_rules! roundtrip_proptest {
+        ($param:ty, $name:ident) => {
+            proptest! {
+                #![proptest_config(ProptestConfig { cases: 32, ..ProptestConfig::default() })]
+                #[test]
+                fn $name(rng_seed in any::<u64>()) {
+                    let backend = MlKem::<$param>::new();
+                    let (ek, dk) = backend.keygen(&[0x42u8; 64]).unwrap();
+                    let (ciphertext, sent) = backend.encapsulate(&ek, &mut TestRng(rng_seed)).unwrap();
+                    let recovered = backend.decapsulate(&dk, &ciphertext).unwrap();
+                    prop_assert_eq!(sent.as_slice(), recovered.as_slice());
+                }
+            }
+        };
+    }
+
+    roundtrip_proptest!(ml_kem::MlKem768, mlkem768_encapsulate_decapsulate);
+    roundtrip_proptest!(ml_kem::MlKem1024, mlkem1024_encapsulate_decapsulate);
 }
