@@ -318,4 +318,20 @@ mod tests {
         let r: Result<Manifest, _> = codec::decode(&wire);
         assert!(r.is_err());
     }
+
+    #[test]
+    fn rejects_unknown_label() {
+        // map(6) whose 6th key is the unknown label 9.
+        let wire = [
+            0xa6, // map(6)
+            0x01, 0x01, //
+            0x02, 0x05, //
+            0x03, 0x63, b'k', b'o', b'f', //
+            0x04, 0x82, 0x2f, 0x42, 0xAB, 0xCD, //
+            0x05, 0x00, //
+            0x09, 0x00, // label 9 (unknown) -> reject
+        ];
+        let r: Result<Manifest, _> = codec::decode(&wire);
+        assert!(r.is_err());
+    }
 }
