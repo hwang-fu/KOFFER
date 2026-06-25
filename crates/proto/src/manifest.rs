@@ -303,4 +303,19 @@ mod tests {
         // Same bytes, different hash algorithm -> does not bind.
         assert!(!manifest.binds(SuitDigest::new(AlgId::new(-43), &[0xAB, 0xCD, 0xEF])));
     }
+
+    #[test]
+    fn rejects_non_ascii_class_id() {
+        // class_id (label 3) = "café"; the 'é' (c3 a9) is non-ASCII -> rejected.
+        let wire = [
+            0xa5, // map(5)
+            0x01, 0x01, // version
+            0x02, 0x05, // sequence
+            0x03, 0x65, 0x63, 0x61, 0x66, 0xc3, 0xa9, // class_id = "café"
+            0x04, 0x82, 0x2f, 0x42, 0xAB, 0xCD, // payload_digest
+            0x05, 0x00, // target_slot
+        ];
+        let r: Result<Manifest, _> = codec::decode(&wire);
+        assert!(r.is_err());
+    }
 }
