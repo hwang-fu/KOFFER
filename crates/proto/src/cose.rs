@@ -186,6 +186,43 @@ impl<'b> Recipient<'b> {
     }
 }
 
+impl<'b> CoseEncrypt<'b> {
+    /// Assembles a `COSE_Encrypt` from its parts.
+    pub fn new(
+        aead_alg: AlgId,
+        nonce: &'b [u8],
+        ciphertext: &'b [u8],
+        recipient: Recipient<'b>,
+    ) -> Self {
+        Self {
+            protected: ProtectedHeader::new(aead_alg),
+            nonce,
+            ciphertext,
+            recipient,
+        }
+    }
+
+    /// The AEAD (content-encryption) algorithm identifier.
+    pub fn aead_alg(&self) -> AlgId {
+        self.protected.alg()
+    }
+
+    /// The AEAD nonce (IV).
+    pub fn nonce(&self) -> &'b [u8] {
+        self.nonce
+    }
+
+    /// The AEAD-encrypted content.
+    pub fn ciphertext(&self) -> &'b [u8] {
+        self.ciphertext
+    }
+
+    /// The recipient.
+    pub fn recipient(&self) -> Recipient<'b> {
+        self.recipient
+    }
+}
+
 impl<C> Encode<C> for ProtectedHeader {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), EncodeError<W::Error>> {
         // The protected header is `bstr .cbor {1: alg}`: build the canonical map in a
