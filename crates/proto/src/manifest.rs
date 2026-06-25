@@ -380,4 +380,16 @@ mod tests {
         let r: Result<Manifest, _> = codec::decode(&wire);
         assert!(r.is_err());
     }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn round_trips_required_only() {
+        let class_id = AsciiStr::try_from("acme-rtos").unwrap();
+        let payload_digest = SuitDigest::new(AlgId::new(-16), &[0x11; 32]);
+        let original = Manifest::new(2, 100, class_id, payload_digest, 1);
+        let bytes = codec::encode(&original).expect("encode");
+        let decoded: Manifest = codec::decode(&bytes).expect("decode");
+        assert_eq!(decoded, original);
+        assert_eq!(codec::encode(&decoded).expect("re-encode"), bytes); // deterministic
+    }
 }
