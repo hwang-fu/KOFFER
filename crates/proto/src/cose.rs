@@ -1,8 +1,9 @@
-//! COSE structures (RFC 9052): the `COSE_Sign1` signed-message envelope and the
-//! canonical `Sig_structure` (the exact to-be-signed bytes).
+//! COSE structures (RFC 9052): the `COSE_Sign1` signed-message envelope with its
+//! `Sig_structure`, and the `COSE_Encrypt` encrypted container.
 //!
-//! proto builds and parses the bytes and ferries the algorithm codepoint; the
-//! actual signing and verifying live in the crypto layer, wired by a consumer.
+//! proto builds and parses the bytes and ferries the algorithm codepoints; the
+//! actual signing, verifying, and encryption live in the crypto layer, wired by a
+//! consumer.
 
 use minicbor::data::Type;
 use minicbor::encode::write::Cursor;
@@ -71,6 +72,19 @@ pub struct SigStructure<'a> {
     payload: &'a [u8],
 }
 
+/// A `COSE_recipient` (RFC 9052 Sec 5): one recipient of a `COSE_Encrypt`.
+///
+/// The 3-element array `[protected, unprotected, ciphertext]`. For KOFFER the
+/// protected header carries the KEM algorithm and the ciphertext slot carries the
+/// KEM encapsulation -- the value that lets the holder of the matching private key
+/// recover the content key. Borrowed from the input, like `CoseSign1`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Recipient<'b> {
+    protected: ProtectedHeader,
+    kid: Option<AsciiStr<'b>>,
+    encapsulation: &'b [u8],
+}
+
 impl ProtectedHeader {
     /// Creates a protected header carrying `alg`.
     pub const fn new(alg: AlgId) -> Self {
@@ -128,6 +142,32 @@ impl<'a> SigStructure<'a> {
             external_aad,
             payload,
         }
+    }
+}
+
+impl<'b> Recipient<'b> {
+    /// Assembles a recipient from its parts.
+    pub fn new(kem_alg: AlgId, kid: Option<AsciiStr<'b>>, encapsulation: &'b [u8]) -> Self {
+        Self {
+            protected: ProtectedHeader::new(kem_alg),
+            kid,
+            encapsulation,
+        }
+    }
+
+    /// The KEM algorithm identifier.
+    pub fn kem_alg(&self) -> AlgId {
+        self.protected.alg()
+    }
+
+    /// The key identifier, if present.
+    pub fn kid(&self) -> Option<AsciiStr<'b>> {
+        self.kid
+    }
+
+    /// The KEM encapsulation bytes.
+    pub fn encapsulation(&self) -> &'b [u8] {
+        self.encapsulation
     }
 }
 
