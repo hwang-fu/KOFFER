@@ -334,4 +334,18 @@ mod tests {
         let r: Result<Manifest, _> = codec::decode(&wire);
         assert!(r.is_err());
     }
+
+    #[test]
+    fn rejects_missing_required_field() {
+        // map(4) missing target_slot (label 5).
+        let wire = [
+            0xa4, // map(4)
+            0x01, 0x01, //
+            0x02, 0x05, //
+            0x03, 0x63, b'k', b'o', b'f', //
+            0x04, 0x82, 0x2f, 0x42, 0xAB, 0xCD, //
+        ];
+        let r: Result<Manifest, _> = codec::decode(&wire);
+        assert!(r.is_err());
+    }
 }
