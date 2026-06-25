@@ -233,6 +233,21 @@ impl<'b, C> Decode<'b, C> for CoseSign1<'b> {
     }
 }
 
+impl<C> Encode<C> for SigStructure<'_> {
+    fn encode<W: Write>(
+        &self,
+        e: &mut Encoder<W>,
+        ctx: &mut C,
+    ) -> Result<(), EncodeError<W::Error>> {
+        e.array(4)?;
+        e.str(CONTEXT_SIGNATURE1)?;
+        // body_protected: the same bstr-wrapped map as the message's protected slot.
+        self.protected.encode(e, ctx)?;
+        e.bytes(self.external_aad)?;
+        e.bytes(self.payload)?.ok()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
