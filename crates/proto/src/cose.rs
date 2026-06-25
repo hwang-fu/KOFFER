@@ -353,4 +353,19 @@ mod tests {
         let r: Result<CoseSign1, _> = codec::decode(&wire);
         assert!(r.is_err());
     }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn sig_structure_has_canonical_shape() {
+        let tbs = codec::encode(&SigStructure::new(AlgId::new(-7), &[], &[0x01])).expect("encode");
+        // [ "Signature1", bstr{1:-7}, bstr(0), bstr(1)=01 ]
+        let expected = [
+            0x84, // array(4)
+            0x6a, b'S', b'i', b'g', b'n', b'a', b't', b'u', b'r', b'e', b'1', // "Signature1"
+            0x43, 0xa1, 0x01, 0x26, // body_protected
+            0x40, // external_aad: empty bstr
+            0x41, 0x01, // payload bstr(1)
+        ];
+        assert_eq!(tbs, expected);
+    }
 }
