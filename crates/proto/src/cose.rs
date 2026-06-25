@@ -1,8 +1,9 @@
-//! COSE structures (RFC 9052): the `COSE_Sign1` signed-message envelope and the
-//! canonical `Sig_structure` (the exact to-be-signed bytes).
+//! COSE structures (RFC 9052): the `COSE_Sign1` signed-message envelope with its
+//! `Sig_structure`, and the `COSE_Encrypt` encrypted container.
 //!
-//! proto builds and parses the bytes and ferries the algorithm codepoint; the
-//! actual signing and verifying live in the crypto layer, wired by a consumer.
+//! proto builds and parses the bytes and ferries the algorithm codepoints; the
+//! actual signing, verifying, and encryption live in the crypto layer, wired by a
+//! consumer.
 
 use minicbor::data::Type;
 use minicbor::encode::write::Cursor;
@@ -20,6 +21,9 @@ const PROTECTED_MAX: usize = 16;
 
 /// COSE header label for the key identifier (RFC 9052 Table 2).
 const LABEL_KID: u8 = 4;
+
+/// COSE header label for the initialization vector / nonce (RFC 9052 Table 2).
+const LABEL_IV: u8 = 5;
 
 /// The COSE context string for a `COSE_Sign1` signature.
 const CONTEXT_SIGNATURE1: &str = "Signature1";
@@ -69,6 +73,34 @@ pub struct SigStructure<'a> {
     protected: ProtectedHeader,
     external_aad: &'a [u8],
     payload: &'a [u8],
+}
+
+/// A `COSE_recipient` (RFC 9052 Sec 5): one recipient of a `COSE_Encrypt`.
+///
+/// The 3-element array `[protected, unprotected, ciphertext]`. For KOFFER the
+/// protected header carries the KEM algorithm and the ciphertext slot carries the
+/// KEM encapsulation -- the value that lets the holder of the matching private key
+/// recover the content key. Borrowed from the input, like `CoseSign1`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Recipient<'b> {
+    protected: ProtectedHeader,
+    kid: Option<AsciiStr<'b>>,
+    encapsulation: &'b [u8],
+}
+
+/// A `COSE_Encrypt` encrypted container (RFC 9052 Sec 5).
+///
+/// The 4-element array `[protected, unprotected, ciphertext, recipients]`. For
+/// KOFFER the protected header carries the AEAD algorithm, the unprotected header
+/// carries the nonce (IV), the ciphertext slot carries the AEAD-encrypted content,
+/// and there is exactly one recipient holding the KEM encapsulation. Borrowed from
+/// the input. proto frames the bytes; the encryption is the crypto layer's.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CoseEncrypt<'b> {
+    protected: ProtectedHeader,
+    nonce: &'b [u8],
+    ciphertext: &'b [u8],
+    recipient: Recipient<'b>,
 }
 
 impl ProtectedHeader {
@@ -128,6 +160,69 @@ impl<'a> SigStructure<'a> {
             external_aad,
             payload,
         }
+    }
+}
+
+impl<'b> Recipient<'b> {
+    /// Assembles a recipient from its parts.
+    pub fn new(kem_alg: AlgId, kid: Option<AsciiStr<'b>>, encapsulation: &'b [u8]) -> Self {
+        Self {
+            protected: ProtectedHeader::new(kem_alg),
+            kid,
+            encapsulation,
+        }
+    }
+
+    /// The KEM algorithm identifier.
+    pub fn kem_alg(&self) -> AlgId {
+        self.protected.alg()
+    }
+
+    /// The key identifier, if present.
+    pub fn kid(&self) -> Option<AsciiStr<'b>> {
+        self.kid
+    }
+
+    /// The KEM encapsulation bytes.
+    pub fn encapsulation(&self) -> &'b [u8] {
+        self.encapsulation
+    }
+}
+
+impl<'b> CoseEncrypt<'b> {
+    /// Assembles a `COSE_Encrypt` from its parts.
+    pub fn new(
+        aead_alg: AlgId,
+        nonce: &'b [u8],
+        ciphertext: &'b [u8],
+        recipient: Recipient<'b>,
+    ) -> Self {
+        Self {
+            protected: ProtectedHeader::new(aead_alg),
+            nonce,
+            ciphertext,
+            recipient,
+        }
+    }
+
+    /// The AEAD (content-encryption) algorithm identifier.
+    pub fn aead_alg(&self) -> AlgId {
+        self.protected.alg()
+    }
+
+    /// The AEAD nonce (IV).
+    pub fn nonce(&self) -> &'b [u8] {
+        self.nonce
+    }
+
+    /// The AEAD-encrypted content.
+    pub fn ciphertext(&self) -> &'b [u8] {
+        self.ciphertext
+    }
+
+    /// The recipient.
+    pub fn recipient(&self) -> Recipient<'b> {
+        self.recipient
     }
 }
 
@@ -245,6 +340,110 @@ impl<C> Encode<C> for SigStructure<'_> {
         self.protected.encode(e, ctx)?;
         e.bytes(self.external_aad)?;
         e.bytes(self.payload)?.ok()
+    }
+}
+
+impl<C> Encode<C> for Recipient<'_> {
+    fn encode<W: Write>(
+        &self,
+        e: &mut Encoder<W>,
+        ctx: &mut C,
+    ) -> Result<(), EncodeError<W::Error>> {
+        e.array(3)?;
+        self.protected.encode(e, ctx)?;
+        match self.kid {
+            Some(kid) => {
+                e.map(1)?.u8(LABEL_KID)?;
+                kid.encode(e, ctx)?;
+            }
+            None => {
+                e.map(0)?;
+            }
+        }
+        e.bytes(self.encapsulation)?.ok()
+    }
+}
+
+impl<'b, C> Decode<'b, C> for Recipient<'b> {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, DecodeError> {
+        if d.array()? != Some(3) {
+            return Err(DecodeError::message(
+                "COSE_recipient must be a 3-element array",
+            ));
+        }
+        let protected: ProtectedHeader = d.decode()?;
+        let kid = match d.map()? {
+            Some(0) => None,
+            Some(1) => {
+                if d.u8()? != LABEL_KID {
+                    return Err(DecodeError::message("unexpected recipient header label"));
+                }
+                let kid: AsciiStr = d.decode()?;
+                Some(kid)
+            }
+            _ => return Err(DecodeError::message("unexpected recipient header")),
+        };
+        let encapsulation = d.bytes()?;
+        Ok(Self {
+            protected,
+            kid,
+            encapsulation,
+        })
+    }
+}
+
+impl<C> Encode<C> for CoseEncrypt<'_> {
+    fn encode<W: Write>(
+        &self,
+        e: &mut Encoder<W>,
+        ctx: &mut C,
+    ) -> Result<(), EncodeError<W::Error>> {
+        e.array(4)?;
+        self.protected.encode(e, ctx)?;
+        // unprotected header: {5: IV}.
+        e.map(1)?.u8(LABEL_IV)?;
+        e.bytes(self.nonce)?;
+        // the AEAD-encrypted content.
+        e.bytes(self.ciphertext)?;
+        // recipients: a one-element array.
+        e.array(1)?;
+        self.recipient.encode(e, ctx)?;
+        Ok(())
+    }
+}
+
+impl<'b, C> Decode<'b, C> for CoseEncrypt<'b> {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, DecodeError> {
+        if d.array()? != Some(4) {
+            return Err(DecodeError::message(
+                "COSE_Encrypt must be a 4-element array",
+            ));
+        }
+        let protected: ProtectedHeader = d.decode()?;
+        // unprotected header: exactly {5: IV}.
+        if d.map()? != Some(1) {
+            return Err(DecodeError::message(
+                "COSE_Encrypt unprotected header must carry the IV",
+            ));
+        }
+        if d.u8()? != LABEL_IV {
+            return Err(DecodeError::message("unexpected COSE_Encrypt header label"));
+        }
+        let nonce = d.bytes()?;
+        let ciphertext = d.bytes()?;
+        // recipients: exactly one.
+        if d.array()? != Some(1) {
+            return Err(DecodeError::message(
+                "COSE_Encrypt must have exactly one recipient",
+            ));
+        }
+        let recipient: Recipient = d.decode()?;
+        Ok(Self {
+            protected,
+            nonce,
+            ciphertext,
+            recipient,
+        })
     }
 }
 
@@ -399,6 +598,110 @@ mod tests {
             "846a5369676e61747572653143a101264c11aa22bb33cc44dd5500669954546869732069732074686520636f6e74656e742e"
         );
     }
+
+    #[test]
+    fn decodes_recipient_without_alloc() {
+        // [ bstr{1:-7}, {}, bstr(2) ] -- the alg codepoint is opaque to proto.
+        let wire = [0x83, 0x43, 0xa1, 0x01, 0x26, 0xa0, 0x42, 0xAB, 0xCD];
+        let r: Recipient = codec::decode(&wire).expect("decode");
+        assert_eq!(r.kem_alg(), AlgId::new(-7));
+        assert!(r.kid().is_none());
+        assert_eq!(r.encapsulation(), &[0xAB, 0xCD]);
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn recipient_round_trips() {
+        let kid = AsciiStr::try_from("device-root").unwrap();
+        let enc = [0x11u8; 16];
+        let original = Recipient::new(AlgId::new(-65539), Some(kid), &enc);
+        let bytes = codec::encode(&original).expect("encode");
+        let decoded: Recipient = codec::decode(&bytes).expect("decode");
+        assert_eq!(decoded, original);
+        assert_eq!(codec::encode(&decoded).expect("re-encode"), bytes); // deterministic
+    }
+
+    #[test]
+    fn recipient_rejects_non_ascii_kid() {
+        // {4: "café"} -- non-ASCII kid -> F15 reject.
+        let wire = [
+            0x83, 0x43, 0xa1, 0x01, 0x26, // array(3), protected bstr{1:-7}
+            0xa1, 0x04, 0x65, 0x63, 0x61, 0x66, 0xc3, 0xa9, // {4: "café"}
+            0x42, 0xAB, 0xCD, // ciphertext bstr(2)
+        ];
+        let r: Result<Recipient, _> = codec::decode(&wire);
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn decodes_cose_encrypt_without_alloc() {
+        let wire = [
+            0x84, 0x43, 0xa1, 0x01, 0x26, // protected {1:-7} (AEAD alg, opaque)
+            0xa1, 0x05, 0x42, 0xAA, 0xBB, // {5: nonce AABB}
+            0x42, 0xCC, 0xDD, // ciphertext CCDD
+            0x81, // recipients array(1)
+            0x83, 0x43, 0xa1, 0x01, 0x26, 0xa0, 0x42, 0xEE,
+            0xFF, // recipient [{1:-7}, {}, EEFF]
+        ];
+        let ce: CoseEncrypt = codec::decode(&wire).expect("decode");
+        assert_eq!(ce.aead_alg(), AlgId::new(-7));
+        assert_eq!(ce.nonce(), &[0xAA, 0xBB]);
+        assert_eq!(ce.ciphertext(), &[0xCC, 0xDD]);
+        assert_eq!(ce.recipient().kem_alg(), AlgId::new(-7));
+        assert_eq!(ce.recipient().encapsulation(), &[0xEE, 0xFF]);
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn cose_encrypt_round_trips() {
+        let kid = AsciiStr::try_from("device-root").unwrap();
+        let enc = [0x11u8; 16];
+        let recipient = Recipient::new(AlgId::new(-65539), Some(kid), &enc);
+        let nonce = [0x22u8; 12];
+        let content = [0x33u8; 20];
+        let original = CoseEncrypt::new(AlgId::new(3), &nonce, &content, recipient);
+        let bytes = codec::encode(&original).expect("encode");
+        let decoded: CoseEncrypt = codec::decode(&bytes).expect("decode");
+        assert_eq!(decoded, original);
+        assert_eq!(codec::encode(&decoded).expect("re-encode"), bytes); // deterministic
+    }
+
+    #[test]
+    fn cose_encrypt_rejects_non_ascii_recipient_kid() {
+        // The nested recipient's kid {4: "café"} is non-ASCII -> F15 reject.
+        let wire = [
+            0x84, 0x43, 0xa1, 0x01, 0x26, 0xa1, 0x05, 0x42, 0xAA, 0xBB, 0x42, 0xCC, 0xDD, 0x81,
+            0x83, 0x43, 0xa1, 0x01, 0x26, 0xa1, 0x04, 0x65, 0x63, 0x61, 0x66, 0xc3, 0xa9, 0x42,
+            0xEE, 0xFF,
+        ];
+        let r: Result<CoseEncrypt, _> = codec::decode(&wire);
+        assert!(r.is_err());
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn cose_encrypt_matches_frozen_vector() {
+        // Self-consistency vector: no published COSE_Encrypt matches our HPKE-style
+        // recipient (KEM alg in the recipient's protected header, no ephemeral key),
+        // so we freeze a fixed structure <-> these exact bytes as a regression guard.
+        // Content alg AES-256-GCM (3), recipient alg ML-KEM-768 (-65539).
+        const KAT_HEX: &str = "8443a10103a1054c01010101010101010101010150c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0818347a1013a00010002a1046b6465766963652d726f6f745820e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0";
+
+        let kid = AsciiStr::try_from("device-root").unwrap();
+        let encapsulation = [0xE0u8; 32];
+        let recipient = Recipient::new(AlgId::new(-65539), Some(kid), &encapsulation);
+        let nonce = [0x01u8; 12];
+        let content = [0xC0u8; 16];
+        let original = CoseEncrypt::new(AlgId::new(3), &nonce, &content, recipient);
+
+        // Encode direction: the structure produces exactly the frozen bytes.
+        let bytes = codec::encode(&original).expect("encode");
+        assert_eq!(to_hex(&bytes), KAT_HEX);
+
+        // Decode direction: those bytes read back to the same structure.
+        let decoded: CoseEncrypt = codec::decode(&bytes).expect("decode");
+        assert_eq!(decoded, original);
+    }
 }
 
 #[cfg(all(test, feature = "alloc"))]
@@ -430,6 +733,28 @@ mod proptests {
 
             let encoded = codec::encode(&original).unwrap();
             let decoded: CoseSign1 = codec::decode(&encoded).unwrap();
+            let reencoded = codec::encode(&decoded).unwrap();
+            prop_assert_eq!(decoded, original);
+            // Deterministic: re-encoding the decoded structure is byte-identical.
+            prop_assert_eq!(reencoded, encoded);
+        }
+
+        #[test]
+        fn cose_encrypt_round_trips(
+            aead_alg in any::<i64>(),
+            kem_alg in any::<i64>(),
+            kid in proptest::option::of(proptest::collection::vec(0x20u8..=0x7E, 0..=16)),
+            nonce in proptest::collection::vec(any::<u8>(), 0..=16),
+            content in proptest::collection::vec(any::<u8>(), 0..=MAX_LEN),
+            encapsulation in proptest::collection::vec(any::<u8>(), 0..=MAX_LEN),
+        ) {
+            let kid_string = kid.map(|bytes| String::from_utf8(bytes).unwrap());
+            let kid = kid_string.as_deref().map(|s| AsciiStr::try_from(s).unwrap());
+            let recipient = Recipient::new(AlgId::new(kem_alg), kid, &encapsulation);
+            let original = CoseEncrypt::new(AlgId::new(aead_alg), &nonce, &content, recipient);
+
+            let encoded = codec::encode(&original).unwrap();
+            let decoded: CoseEncrypt = codec::decode(&encoded).unwrap();
             let reencoded = codec::encode(&decoded).unwrap();
             prop_assert_eq!(decoded, original);
             // Deterministic: re-encoding the decoded structure is byte-identical.
