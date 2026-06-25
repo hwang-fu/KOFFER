@@ -392,4 +392,21 @@ mod tests {
         assert_eq!(decoded, original);
         assert_eq!(codec::encode(&decoded).expect("re-encode"), bytes); // deterministic
     }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn round_trips_with_all_optionals() {
+        let class_id = AsciiStr::try_from("acme-rtos").unwrap();
+        let payload_digest = SuitDigest::new(AlgId::new(-16), &[0x22; 32]);
+        let version_string = AsciiStr::try_from("1.2.3").unwrap();
+        let encrypted_digest = SuitDigest::new(AlgId::new(-16), &[0x33; 32]);
+        let key_ref = AsciiStr::try_from("device-root").unwrap();
+        let original = Manifest::new(1, 42, class_id, payload_digest, 0)
+            .with_version_string(version_string)
+            .with_encrypted(encrypted_digest, key_ref);
+        let bytes = codec::encode(&original).expect("encode");
+        let decoded: Manifest = codec::decode(&bytes).expect("decode");
+        assert_eq!(decoded, original);
+        assert_eq!(codec::encode(&decoded).expect("re-encode"), bytes); // deterministic
+    }
 }
