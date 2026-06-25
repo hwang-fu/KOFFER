@@ -348,4 +348,20 @@ mod tests {
         let r: Result<Manifest, _> = codec::decode(&wire);
         assert!(r.is_err());
     }
+
+    #[test]
+    fn rejects_encrypted_digest_without_key_ref() {
+        // map(6) with encrypted_digest (label 7) but no key_ref (label 8).
+        let wire = [
+            0xa6, // map(6)
+            0x01, 0x01, //
+            0x02, 0x05, //
+            0x03, 0x63, b'k', b'o', b'f', //
+            0x04, 0x82, 0x2f, 0x42, 0xAB, 0xCD, //
+            0x05, 0x00, //
+            0x07, 0x82, 0x2f, 0x42, 0xBB, 0xCC, // encrypted_digest, no key_ref -> reject
+        ];
+        let r: Result<Manifest, _> = codec::decode(&wire);
+        assert!(r.is_err());
+    }
 }
