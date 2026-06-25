@@ -364,4 +364,20 @@ mod tests {
         let r: Result<Manifest, _> = codec::decode(&wire);
         assert!(r.is_err());
     }
+
+    #[test]
+    fn rejects_indefinite_map() {
+        // 0xbf is an indefinite-length map; canonical decode requires definite length.
+        let wire = [
+            0xbf, // map(*) indefinite
+            0x01, 0x01, //
+            0x02, 0x05, //
+            0x03, 0x63, b'k', b'o', b'f', //
+            0x04, 0x82, 0x2f, 0x42, 0xAB, 0xCD, //
+            0x05, 0x00, //
+            0xff, // break
+        ];
+        let r: Result<Manifest, _> = codec::decode(&wire);
+        assert!(r.is_err());
+    }
 }
