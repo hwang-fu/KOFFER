@@ -4,6 +4,7 @@
 //! proto builds and parses the bytes and ferries the algorithm codepoint; the
 //! actual signing and verifying live in the crypto layer, wired by a consumer.
 
+use minicbor::data::Type;
 use minicbor::encode::write::Cursor;
 
 use crate::alg::AlgId;
@@ -139,6 +140,68 @@ impl<'b, C> Decode<'b, C> for ProtectedHeader {
             return Err(DecodeError::message("protected header has trailing bytes"));
         }
         Ok(Self::new(alg))
+    }
+}
+
+impl<C> Encode<C> for CoseSign1<'_> {
+    fn encode<W: Write>(
+        &self,
+        e: &mut Encoder<W>,
+        ctx: &mut C,
+    ) -> Result<(), EncodeError<W::Error>> {
+        e.array(4)?;
+        self.protected.encode(e, ctx)?;
+        match self.kid {
+            Some(kid) => {
+                e.map(1)?.u8(LABEL_KID)?;
+                kid.encode(e, ctx)?;
+            }
+            None => {
+                e.map(0)?;
+            }
+        }
+        match self.payload {
+            Payload::Detached => {
+                e.null()?;
+            }
+            Payload::Attached(bytes) => {
+                e.bytes(bytes)?;
+            }
+        }
+        e.bytes(self.signature)?.ok()
+    }
+}
+
+impl<'b, C> Decode<'b, C> for CoseSign1<'b> {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, DecodeError> {
+        if d.array()? != Some(4) {
+            return Err(DecodeError::message("COSE_Sign1 must be a 4-element array"));
+        }
+        let protected: ProtectedHeader = d.decode()?;
+        let kid = match d.map()? {
+            Some(0) => None,
+            Some(1) => {
+                if d.u8()? != LABEL_KID {
+                    return Err(DecodeError::message("unexpected unprotected header label"));
+                }
+                let kid: AsciiStr = d.decode()?; // F15-validated on decode
+                Some(kid)
+            }
+            _ => return Err(DecodeError::message("unexpected unprotected header")),
+        };
+        let payload = if d.datatype()? == Type::Null {
+            d.null()?;
+            Payload::Detached
+        } else {
+            Payload::Attached(d.bytes()?)
+        };
+        let signature = d.bytes()?;
+        Ok(Self {
+            protected,
+            kid,
+            payload,
+            signature,
+        })
     }
 }
 
