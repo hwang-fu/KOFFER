@@ -488,6 +488,40 @@ mod tests {
             "846a5369676e61747572653143a101264c11aa22bb33cc44dd5500669954546869732069732074686520636f6e74656e742e"
         );
     }
+
+    #[test]
+    fn decodes_recipient_without_alloc() {
+        // [ bstr{1:-7}, {}, bstr(2) ] -- the alg codepoint is opaque to proto.
+        let wire = [0x83, 0x43, 0xa1, 0x01, 0x26, 0xa0, 0x42, 0xAB, 0xCD];
+        let r: Recipient = codec::decode(&wire).expect("decode");
+        assert_eq!(r.kem_alg(), AlgId::new(-7));
+        assert!(r.kid().is_none());
+        assert_eq!(r.encapsulation(), &[0xAB, 0xCD]);
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn recipient_round_trips() {
+        let kid = AsciiStr::try_from("device-root").unwrap();
+        let enc = [0x11u8; 16];
+        let original = Recipient::new(AlgId::new(-65539), Some(kid), &enc);
+        let bytes = codec::encode(&original).expect("encode");
+        let decoded: Recipient = codec::decode(&bytes).expect("decode");
+        assert_eq!(decoded, original);
+        assert_eq!(codec::encode(&decoded).expect("re-encode"), bytes); // deterministic
+    }
+
+    #[test]
+    fn recipient_rejects_non_ascii_kid() {
+        // {4: "café"} -- non-ASCII kid -> F15 reject.
+        let wire = [
+            0x83, 0x43, 0xa1, 0x01, 0x26, // array(3), protected bstr{1:-7}
+            0xa1, 0x04, 0x65, 0x63, 0x61, 0x66, 0xc3, 0xa9, // {4: "café"}
+            0x42, 0xAB, 0xCD, // ciphertext bstr(2)
+        ];
+        let r: Result<Recipient, _> = codec::decode(&wire);
+        assert!(r.is_err());
+    }
 }
 
 #[cfg(all(test, feature = "alloc"))]
