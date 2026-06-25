@@ -288,6 +288,55 @@ impl<C> Encode<C> for SigStructure<'_> {
     }
 }
 
+impl<C> Encode<C> for Recipient<'_> {
+    fn encode<W: Write>(
+        &self,
+        e: &mut Encoder<W>,
+        ctx: &mut C,
+    ) -> Result<(), EncodeError<W::Error>> {
+        e.array(3)?;
+        self.protected.encode(e, ctx)?;
+        match self.kid {
+            Some(kid) => {
+                e.map(1)?.u8(LABEL_KID)?;
+                kid.encode(e, ctx)?;
+            }
+            None => {
+                e.map(0)?;
+            }
+        }
+        e.bytes(self.encapsulation)?.ok()
+    }
+}
+
+impl<'b, C> Decode<'b, C> for Recipient<'b> {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, DecodeError> {
+        if d.array()? != Some(3) {
+            return Err(DecodeError::message(
+                "COSE_recipient must be a 3-element array",
+            ));
+        }
+        let protected: ProtectedHeader = d.decode()?;
+        let kid = match d.map()? {
+            Some(0) => None,
+            Some(1) => {
+                if d.u8()? != LABEL_KID {
+                    return Err(DecodeError::message("unexpected recipient header label"));
+                }
+                let kid: AsciiStr = d.decode()?;
+                Some(kid)
+            }
+            _ => return Err(DecodeError::message("unexpected recipient header")),
+        };
+        let encapsulation = d.bytes()?;
+        Ok(Self {
+            protected,
+            kid,
+            encapsulation,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
