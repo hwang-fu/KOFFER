@@ -12,6 +12,15 @@
 use crate::codec::{Decode, DecodeError, Decoder, Encode, EncodeError, Encoder, Write};
 use crate::{alg::AlgId, ascii::AsciiStr};
 
+const LABEL_VERSION: u8 = 1;
+const LABEL_SEQUENCE: u8 = 2;
+const LABEL_CLASS_ID: u8 = 3;
+const LABEL_PAYLOAD_DIGEST: u8 = 4;
+const LABEL_TARGET_SLOT: u8 = 5;
+const LABEL_VERSION_STRING: u8 = 6;
+const LABEL_ENCRYPTED_DIGEST: u8 = 7;
+const LABEL_KEY_REF: u8 = 8;
+
 /// A SUIT-style digest: the hash algorithm plus the digest bytes (`[alg, bstr]`).
 ///
 /// Carrying the algorithm makes the binding profile-agnostic -- SHA-256 or SHA-384 --
@@ -157,5 +166,87 @@ impl<'b> Manifest<'b> {
     /// The optional key-info reference.
     pub fn key_ref(&self) -> Option<AsciiStr<'b>> {
         self.key_ref
+    }
+}
+
+impl<C> Encode<C> for Manifest<'_> {
+    fn encode<W: Write>(
+        &self,
+        e: &mut Encoder<W>,
+        ctx: &mut C,
+    ) -> Result<(), EncodeError<W::Error>> {
+        let entries = 5
+            + self.version_string.is_some() as u64
+            + self.encrypted_digest.is_some() as u64
+            + self.key_ref.is_some() as u64;
+        e.map(entries)?;
+        // ascending label order (canonical, so the signed bytes are stable).
+        e.u8(LABEL_VERSION)?.u8(self.version)?;
+        e.u8(LABEL_SEQUENCE)?.u64(self.sequence)?;
+        e.u8(LABEL_CLASS_ID)?;
+        self.class_id.encode(e, ctx)?;
+        e.u8(LABEL_PAYLOAD_DIGEST)?;
+        self.payload_digest.encode(e, ctx)?;
+        e.u8(LABEL_TARGET_SLOT)?.u8(self.target_slot)?;
+        if let Some(version_string) = self.version_string {
+            e.u8(LABEL_VERSION_STRING)?;
+            version_string.encode(e, ctx)?;
+        }
+        if let Some(encrypted_digest) = self.encrypted_digest {
+            e.u8(LABEL_ENCRYPTED_DIGEST)?;
+            encrypted_digest.encode(e, ctx)?;
+        }
+        if let Some(key_ref) = self.key_ref {
+            e.u8(LABEL_KEY_REF)?;
+            key_ref.encode(e, ctx)?;
+        }
+        Ok(())
+    }
+}
+
+impl<'b, C> Decode<'b, C> for Manifest<'b> {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, DecodeError> {
+        let entries = d
+            .map()?
+            .ok_or_else(|| DecodeError::message("manifest must be a definite map"))?;
+        let mut version = None;
+        let mut sequence = None;
+        let mut class_id = None;
+        let mut payload_digest = None;
+        let mut target_slot = None;
+        let mut version_string = None;
+        let mut encrypted_digest = None;
+        let mut key_ref = None;
+        for _ in 0..entries {
+            match d.u8()? {
+                LABEL_VERSION => version = Some(d.u8()?),
+                LABEL_SEQUENCE => sequence = Some(d.u64()?),
+                LABEL_CLASS_ID => class_id = Some(d.decode()?),
+                LABEL_PAYLOAD_DIGEST => payload_digest = Some(d.decode()?),
+                LABEL_TARGET_SLOT => target_slot = Some(d.u8()?),
+                LABEL_VERSION_STRING => version_string = Some(d.decode()?),
+                LABEL_ENCRYPTED_DIGEST => encrypted_digest = Some(d.decode()?),
+                LABEL_KEY_REF => key_ref = Some(d.decode()?),
+                _ => return Err(DecodeError::message("unknown manifest label")),
+            }
+        }
+        // The encrypted-update fields are paired: both present or both absent.
+        if encrypted_digest.is_some() != key_ref.is_some() {
+            return Err(DecodeError::message(
+                "encrypted_digest and key_ref must both be present or both absent",
+            ));
+        }
+        Ok(Self {
+            version: version.ok_or_else(|| DecodeError::message("manifest missing version"))?,
+            sequence: sequence.ok_or_else(|| DecodeError::message("manifest missing sequence"))?,
+            class_id: class_id.ok_or_else(|| DecodeError::message("manifest missing class_id"))?,
+            payload_digest: payload_digest
+                .ok_or_else(|| DecodeError::message("manifest missing payload_digest"))?,
+            target_slot: target_slot
+                .ok_or_else(|| DecodeError::message("manifest missing target_slot"))?,
+            version_string,
+            encrypted_digest,
+            key_ref,
+        })
     }
 }
