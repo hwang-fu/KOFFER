@@ -85,6 +85,21 @@ pub struct Recipient<'b> {
     encapsulation: &'b [u8],
 }
 
+/// A `COSE_Encrypt` encrypted container (RFC 9052 Sec 5).
+///
+/// The 4-element array `[protected, unprotected, ciphertext, recipients]`. For
+/// KOFFER the protected header carries the AEAD algorithm, the unprotected header
+/// carries the nonce (IV), the ciphertext slot carries the AEAD-encrypted content,
+/// and there is exactly one recipient holding the KEM encapsulation. Borrowed from
+/// the input. proto frames the bytes; the encryption is the crypto layer's.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CoseEncrypt<'b> {
+    protected: ProtectedHeader,
+    nonce: &'b [u8],
+    ciphertext: &'b [u8],
+    recipient: Recipient<'b>,
+}
+
 impl ProtectedHeader {
     /// Creates a protected header carrying `alg`.
     pub const fn new(alg: AlgId) -> Self {
