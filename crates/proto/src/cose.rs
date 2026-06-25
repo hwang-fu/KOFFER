@@ -738,5 +738,27 @@ mod proptests {
             // Deterministic: re-encoding the decoded structure is byte-identical.
             prop_assert_eq!(reencoded, encoded);
         }
+
+        #[test]
+        fn cose_encrypt_round_trips(
+            aead_alg in any::<i64>(),
+            kem_alg in any::<i64>(),
+            kid in proptest::option::of(proptest::collection::vec(0x20u8..=0x7E, 0..=16)),
+            nonce in proptest::collection::vec(any::<u8>(), 0..=16),
+            content in proptest::collection::vec(any::<u8>(), 0..=MAX_LEN),
+            encapsulation in proptest::collection::vec(any::<u8>(), 0..=MAX_LEN),
+        ) {
+            let kid_string = kid.map(|bytes| String::from_utf8(bytes).unwrap());
+            let kid = kid_string.as_deref().map(|s| AsciiStr::try_from(s).unwrap());
+            let recipient = Recipient::new(AlgId::new(kem_alg), kid, &encapsulation);
+            let original = CoseEncrypt::new(AlgId::new(aead_alg), &nonce, &content, recipient);
+
+            let encoded = codec::encode(&original).unwrap();
+            let decoded: CoseEncrypt = codec::decode(&encoded).unwrap();
+            let reencoded = codec::encode(&decoded).unwrap();
+            prop_assert_eq!(decoded, original);
+            // Deterministic: re-encoding the decoded structure is byte-identical.
+            prop_assert_eq!(reencoded, encoded);
+        }
     }
 }
