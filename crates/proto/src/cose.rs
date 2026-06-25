@@ -400,3 +400,40 @@ mod tests {
         );
     }
 }
+
+#[cfg(all(test, feature = "alloc"))]
+mod proptests {
+    use super::*;
+    use crate::codec;
+    use proptest::prelude::*;
+
+    const MAX_LEN: usize = 64;
+
+    proptest! {
+        #[test]
+        fn cose_sign1_round_trips(
+            alg in any::<i64>(),
+            // An optional kid of printable-ASCII bytes (so AsciiStr always accepts it).
+            kid in proptest::option::of(proptest::collection::vec(0x20u8..=0x7E, 0..=16)),
+            attached in any::<bool>(),
+            payload in proptest::collection::vec(any::<u8>(), 0..=MAX_LEN),
+            signature in proptest::collection::vec(any::<u8>(), 0..=MAX_LEN),
+        ) {
+            let kid_string = kid.map(|bytes| String::from_utf8(bytes).unwrap());
+            let kid = kid_string.as_deref().map(|s| AsciiStr::try_from(s).unwrap());
+            let payload = if attached {
+                Payload::Attached(&payload)
+            } else {
+                Payload::Detached
+            };
+            let original = CoseSign1::new(AlgId::new(alg), kid, payload, &signature);
+
+            let encoded = codec::encode(&original).unwrap();
+            let decoded: CoseSign1 = codec::decode(&encoded).unwrap();
+            let reencoded = codec::encode(&decoded).unwrap();
+            prop_assert_eq!(decoded, original);
+            // Deterministic: re-encoding the decoded structure is byte-identical.
+            prop_assert_eq!(reencoded, encoded);
+        }
+    }
+}
