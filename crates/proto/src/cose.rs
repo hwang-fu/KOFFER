@@ -21,6 +21,9 @@ const PROTECTED_MAX: usize = 16;
 /// COSE header label for the key identifier (RFC 9052 Table 2).
 const LABEL_KID: u8 = 4;
 
+/// The COSE context string for a `COSE_Sign1` signature.
+const CONTEXT_SIGNATURE1: &str = "Signature1";
+
 /// The payload slot of a `COSE_Sign1`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Payload<'b> {
@@ -52,6 +55,20 @@ pub struct CoseSign1<'b> {
     kid: Option<AsciiStr<'b>>,
     payload: Payload<'b>,
     signature: &'b [u8],
+}
+
+/// The COSE `Sig_structure`: the exact canonical bytes a `COSE_Sign1` signature is
+/// computed over (RFC 9052 Sec 4.4).
+///
+/// `["Signature1", body_protected, external_aad, payload]`. Both signer and verifier
+/// rebuild this identically and run the signature over it -- deterministic encoding
+/// is what makes them agree. `external_aad` is empty unless the application binds
+/// extra context; `payload` is the signed content (the attached bytes, or the
+/// externally-supplied bytes in detached mode).
+pub struct SigStructure<'a> {
+    protected: ProtectedHeader,
+    external_aad: &'a [u8],
+    payload: &'a [u8],
 }
 
 impl ProtectedHeader {
@@ -100,6 +117,17 @@ impl<'b> CoseSign1<'b> {
     /// The signature bytes.
     pub fn signature(&self) -> &'b [u8] {
         self.signature
+    }
+}
+
+impl<'a> SigStructure<'a> {
+    /// Builds the Sig_structure for a signature over `payload` with `alg`.
+    pub fn new(alg: AlgId, external_aad: &'a [u8], payload: &'a [u8]) -> Self {
+        Self {
+            protected: ProtectedHeader::new(alg),
+            external_aad,
+            payload,
+        }
     }
 }
 
