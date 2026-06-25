@@ -632,6 +632,51 @@ mod tests {
         let r: Result<Recipient, _> = codec::decode(&wire);
         assert!(r.is_err());
     }
+
+    #[test]
+    fn decodes_cose_encrypt_without_alloc() {
+        let wire = [
+            0x84, 0x43, 0xa1, 0x01, 0x26, // protected {1:-7} (AEAD alg, opaque)
+            0xa1, 0x05, 0x42, 0xAA, 0xBB, // {5: nonce AABB}
+            0x42, 0xCC, 0xDD, // ciphertext CCDD
+            0x81, // recipients array(1)
+            0x83, 0x43, 0xa1, 0x01, 0x26, 0xa0, 0x42, 0xEE,
+            0xFF, // recipient [{1:-7}, {}, EEFF]
+        ];
+        let ce: CoseEncrypt = codec::decode(&wire).expect("decode");
+        assert_eq!(ce.aead_alg(), AlgId::new(-7));
+        assert_eq!(ce.nonce(), &[0xAA, 0xBB]);
+        assert_eq!(ce.ciphertext(), &[0xCC, 0xDD]);
+        assert_eq!(ce.recipient().kem_alg(), AlgId::new(-7));
+        assert_eq!(ce.recipient().encapsulation(), &[0xEE, 0xFF]);
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn cose_encrypt_round_trips() {
+        let kid = AsciiStr::try_from("device-root").unwrap();
+        let enc = [0x11u8; 16];
+        let recipient = Recipient::new(AlgId::new(-65539), Some(kid), &enc);
+        let nonce = [0x22u8; 12];
+        let content = [0x33u8; 20];
+        let original = CoseEncrypt::new(AlgId::new(3), &nonce, &content, recipient);
+        let bytes = codec::encode(&original).expect("encode");
+        let decoded: CoseEncrypt = codec::decode(&bytes).expect("decode");
+        assert_eq!(decoded, original);
+        assert_eq!(codec::encode(&decoded).expect("re-encode"), bytes); // deterministic
+    }
+
+    #[test]
+    fn cose_encrypt_rejects_non_ascii_recipient_kid() {
+        // The nested recipient's kid {4: "café"} is non-ASCII -> F15 reject.
+        let wire = [
+            0x84, 0x43, 0xa1, 0x01, 0x26, 0xa1, 0x05, 0x42, 0xAA, 0xBB, 0x42, 0xCC, 0xDD, 0x81,
+            0x83, 0x43, 0xa1, 0x01, 0x26, 0xa1, 0x04, 0x65, 0x63, 0x61, 0x66, 0xc3, 0xa9, 0x42,
+            0xEE, 0xFF,
+        ];
+        let r: Result<CoseEncrypt, _> = codec::decode(&wire);
+        assert!(r.is_err());
+    }
 }
 
 #[cfg(all(test, feature = "alloc"))]
