@@ -257,4 +257,57 @@ mod tests {
             assert_eq!(codec::encode(&decoded).expect("re-encode"), bytes);
         }
     }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn round_trips_detached() {
+        let kid = AsciiStr::try_from("device-root").unwrap();
+        let sig = [0xABu8; 8];
+        let original = CoseSign1::new(AlgId::new(-7), Some(kid), Payload::Detached, &sig);
+        let bytes = codec::encode(&original).expect("encode");
+        let decoded: CoseSign1 = codec::decode(&bytes).expect("decode");
+        assert_eq!(decoded, original);
+        assert_eq!(codec::encode(&decoded).expect("re-encode"), bytes); // deterministic
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn round_trips_attached() {
+        let sig = [0xCDu8; 8];
+        let original = CoseSign1::new(AlgId::new(-7), None, Payload::Attached(b"firmware"), &sig);
+        let bytes = codec::encode(&original).expect("encode");
+        let decoded: CoseSign1 = codec::decode(&bytes).expect("decode");
+        assert_eq!(decoded, original);
+        assert_eq!(codec::encode(&decoded).expect("re-encode"), bytes);
+    }
+
+    #[test]
+    fn decodes_detached_without_alloc() {
+        // [ bstr{1:-7}, {}, nil, bstr(2) ]
+        let wire = [0x84, 0x43, 0xa1, 0x01, 0x26, 0xa0, 0xf6, 0x42, 0xAB, 0xCD];
+        let decoded: CoseSign1 = codec::decode(&wire).expect("decode");
+        assert_eq!(decoded.alg(), AlgId::new(-7));
+        assert!(decoded.kid().is_none());
+        assert_eq!(decoded.payload(), Payload::Detached);
+        assert_eq!(decoded.signature(), &[0xAB, 0xCD]);
+    }
+
+    #[test]
+    fn rejects_non_ascii_kid() {
+        // unprotected {4: "café"} -- the kid's 'é' (c3 a9) is non-ASCII -> F15 reject.
+        let wire = [
+            0x84, 0x43, 0xa1, 0x01, 0x26, // array(4), protected bstr{1:-7}
+            0xa1, 0x04, 0x65, 0x63, 0x61, 0x66, 0xc3, 0xa9, // {4: "café"}
+            0xf6, 0x41, 0xAB, // nil payload, bstr(1) signature
+        ];
+        let r: Result<CoseSign1, _> = codec::decode(&wire);
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn rejects_non_4_element_array() {
+        let wire = [0x83, 0x43, 0xa1, 0x01, 0x26, 0xa0, 0xf6]; // a 3-element array
+        let r: Result<CoseSign1, _> = codec::decode(&wire);
+        assert!(r.is_err());
+    }
 }
