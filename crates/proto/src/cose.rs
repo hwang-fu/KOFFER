@@ -7,6 +7,7 @@
 use minicbor::encode::write::Cursor;
 
 use crate::alg::AlgId;
+use crate::ascii::AsciiStr;
 use crate::codec::{Decode, DecodeError, Decoder, Encode, EncodeError, Encoder, Write};
 
 /// COSE header label for the algorithm identifier (RFC 9052 Table 2).
@@ -15,6 +16,19 @@ const LABEL_ALG: u8 = 1;
 /// Upper bound on the encoded protected-header map `{1: alg}`: the map and label
 /// prefix (`0xa1 0x01`) plus a maximum 9-byte CBOR integer for the algorithm.
 const PROTECTED_MAX: usize = 16;
+
+/// COSE header label for the key identifier (RFC 9052 Table 2).
+const LABEL_KID: u8 = 4;
+
+/// The payload slot of a `COSE_Sign1`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Payload<'b> {
+    /// Detached: the slot is CBOR `nil`; the real payload is supplied separately and
+    /// identified by its digest (which the SUIT manifest carries).
+    Detached,
+    /// Attached: the payload bytes are carried inline as a CBOR byte string.
+    Attached(&'b [u8]),
+}
 
 /// The COSE protected header: the metadata the signature covers.
 ///
@@ -26,6 +40,19 @@ pub struct ProtectedHeader {
     alg: AlgId,
 }
 
+/// A `COSE_Sign1` single-signer signed message (RFC 9052).
+///
+/// The 4-element CBOR array `[protected, unprotected, payload-or-nil, signature]`.
+/// Borrows its variable-length fields from the input, so decoding is zero-copy with
+/// no size cap. proto carries these bytes; it never signs or verifies.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CoseSign1<'b> {
+    protected: ProtectedHeader,
+    kid: Option<AsciiStr<'b>>,
+    payload: Payload<'b>,
+    signature: &'b [u8],
+}
+
 impl ProtectedHeader {
     /// Creates a protected header carrying `alg`.
     pub const fn new(alg: AlgId) -> Self {
@@ -35,6 +62,43 @@ impl ProtectedHeader {
     /// The algorithm identifier.
     pub const fn alg(&self) -> AlgId {
         self.alg
+    }
+}
+
+impl<'b> CoseSign1<'b> {
+    /// Assembles a `COSE_Sign1` from its parts (the signature comes from the crypto layer).
+    pub fn new(
+        alg: AlgId,
+        kid: Option<AsciiStr<'b>>,
+        payload: Payload<'b>,
+        signature: &'b [u8],
+    ) -> Self {
+        Self {
+            protected: ProtectedHeader::new(alg),
+            kid,
+            payload,
+            signature,
+        }
+    }
+
+    /// The algorithm identifier (from the protected header).
+    pub fn alg(&self) -> AlgId {
+        self.protected.alg()
+    }
+
+    /// The key identifier, if present.
+    pub fn kid(&self) -> Option<AsciiStr<'b>> {
+        self.kid
+    }
+
+    /// The payload.
+    pub fn payload(&self) -> Payload<'b> {
+        self.payload
+    }
+
+    /// The signature bytes.
+    pub fn signature(&self) -> &'b [u8] {
+        self.signature
     }
 }
 
