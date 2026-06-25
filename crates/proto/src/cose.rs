@@ -22,6 +22,9 @@ const PROTECTED_MAX: usize = 16;
 /// COSE header label for the key identifier (RFC 9052 Table 2).
 const LABEL_KID: u8 = 4;
 
+/// COSE header label for the initialization vector / nonce (RFC 9052 Table 2).
+const LABEL_IV: u8 = 5;
+
 /// The COSE context string for a `COSE_Sign1` signature.
 const CONTEXT_SIGNATURE1: &str = "Signature1";
 
@@ -385,6 +388,61 @@ impl<'b, C> Decode<'b, C> for Recipient<'b> {
             protected,
             kid,
             encapsulation,
+        })
+    }
+}
+
+impl<C> Encode<C> for CoseEncrypt<'_> {
+    fn encode<W: Write>(
+        &self,
+        e: &mut Encoder<W>,
+        ctx: &mut C,
+    ) -> Result<(), EncodeError<W::Error>> {
+        e.array(4)?;
+        self.protected.encode(e, ctx)?;
+        // unprotected header: {5: IV}.
+        e.map(1)?.u8(LABEL_IV)?;
+        e.bytes(self.nonce)?;
+        // the AEAD-encrypted content.
+        e.bytes(self.ciphertext)?;
+        // recipients: a one-element array.
+        e.array(1)?;
+        self.recipient.encode(e, ctx)?;
+        Ok(())
+    }
+}
+
+impl<'b, C> Decode<'b, C> for CoseEncrypt<'b> {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, DecodeError> {
+        if d.array()? != Some(4) {
+            return Err(DecodeError::message(
+                "COSE_Encrypt must be a 4-element array",
+            ));
+        }
+        let protected: ProtectedHeader = d.decode()?;
+        // unprotected header: exactly {5: IV}.
+        if d.map()? != Some(1) {
+            return Err(DecodeError::message(
+                "COSE_Encrypt unprotected header must carry the IV",
+            ));
+        }
+        if d.u8()? != LABEL_IV {
+            return Err(DecodeError::message("unexpected COSE_Encrypt header label"));
+        }
+        let nonce = d.bytes()?;
+        let ciphertext = d.bytes()?;
+        // recipients: exactly one.
+        if d.array()? != Some(1) {
+            return Err(DecodeError::message(
+                "COSE_Encrypt must have exactly one recipient",
+            ));
+        }
+        let recipient: Recipient = d.decode()?;
+        Ok(Self {
+            protected,
+            nonce,
+            ciphertext,
+            recipient,
         })
     }
 }
