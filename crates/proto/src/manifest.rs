@@ -167,6 +167,17 @@ impl<'b> Manifest<'b> {
     pub fn key_ref(&self) -> Option<AsciiStr<'b>> {
         self.key_ref
     }
+
+    /// Whether this manifest binds the given payload digest: whether the supplied
+    /// digest -- produced by hashing the actual image -- matches the one the manifest
+    /// commits to, in both algorithm and bytes. Signing the small manifest then
+    /// authenticates the large image, since the manifest commits to its digest.
+    ///
+    /// Variable-time comparison is correct here: both digests are public (the
+    /// committed one ships inside the signed manifest), so no secret can leak.
+    pub fn binds(&self, computed: SuitDigest<'_>) -> bool {
+        self.payload_digest == computed
+    }
 }
 
 impl<C> Encode<C> for Manifest<'_> {
