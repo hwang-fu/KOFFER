@@ -677,6 +677,31 @@ mod tests {
         let r: Result<CoseEncrypt, _> = codec::decode(&wire);
         assert!(r.is_err());
     }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn cose_encrypt_matches_frozen_vector() {
+        // Self-consistency vector: no published COSE_Encrypt matches our HPKE-style
+        // recipient (KEM alg in the recipient's protected header, no ephemeral key),
+        // so we freeze a fixed structure <-> these exact bytes as a regression guard.
+        // Content alg AES-256-GCM (3), recipient alg ML-KEM-768 (-65539).
+        const KAT_HEX: &str = "8443a10103a1054c01010101010101010101010150c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0818347a1013a00010002a1046b6465766963652d726f6f745820e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0";
+
+        let kid = AsciiStr::try_from("device-root").unwrap();
+        let encapsulation = [0xE0u8; 32];
+        let recipient = Recipient::new(AlgId::new(-65539), Some(kid), &encapsulation);
+        let nonce = [0x01u8; 12];
+        let content = [0xC0u8; 16];
+        let original = CoseEncrypt::new(AlgId::new(3), &nonce, &content, recipient);
+
+        // Encode direction: the structure produces exactly the frozen bytes.
+        let bytes = codec::encode(&original).expect("encode");
+        assert_eq!(to_hex(&bytes), KAT_HEX);
+
+        // Decode direction: those bytes read back to the same structure.
+        let decoded: CoseEncrypt = codec::decode(&bytes).expect("decode");
+        assert_eq!(decoded, original);
+    }
 }
 
 #[cfg(all(test, feature = "alloc"))]
