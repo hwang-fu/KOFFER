@@ -443,3 +443,58 @@ mod tests {
         assert_eq!(decoded, original);
     }
 }
+
+#[cfg(all(test, feature = "alloc"))]
+mod proptests {
+    use super::*;
+    use crate::codec;
+    use proptest::prelude::*;
+
+    const MAX_LEN: usize = 64;
+
+    proptest! {
+        #[test]
+        fn manifest_round_trips(
+            version in any::<u8>(),
+            sequence in any::<u64>(),
+            class_id in proptest::collection::vec(0x20u8..=0x7E, 1..=16),
+            digest_alg in any::<i64>(),
+            digest_bytes in proptest::collection::vec(any::<u8>(), 0..=MAX_LEN),
+            target_slot in any::<u8>(),
+            version_string in proptest::option::of(proptest::collection::vec(0x20u8..=0x7E, 0..=16)),
+            encrypted in proptest::option::of((
+                any::<i64>(),
+                proptest::collection::vec(any::<u8>(), 0..=MAX_LEN),
+                proptest::collection::vec(0x20u8..=0x7E, 1..=16),
+            )),
+        ) {
+            // Owned backing for every borrowed field, all outliving the manifest below.
+            let class_id = String::from_utf8(class_id).unwrap();
+            let version_string = version_string.map(|b| String::from_utf8(b).unwrap());
+            let encrypted = encrypted.map(|(alg, bytes, key)| (alg, bytes, String::from_utf8(key).unwrap()));
+
+            let payload_digest = SuitDigest::new(AlgId::new(digest_alg), &digest_bytes);
+            let mut manifest = Manifest::new(
+                version,
+                sequence,
+                AsciiStr::try_from(class_id.as_str()).unwrap(),
+                payload_digest,
+                target_slot,
+            );
+            if let Some(s) = version_string.as_deref() {
+                manifest = manifest.with_version_string(AsciiStr::try_from(s).unwrap());
+            }
+            if let Some((alg, bytes, key)) = encrypted.as_ref() {
+                let digest = SuitDigest::new(AlgId::new(*alg), bytes);
+                manifest = manifest.with_encrypted(digest, AsciiStr::try_from(key.as_str()).unwrap());
+            }
+
+            let encoded = codec::encode(&manifest).unwrap();
+            let decoded: Manifest = codec::decode(&encoded).unwrap();
+            let reencoded = codec::encode(&decoded).unwrap();
+            prop_assert_eq!(decoded, manifest);
+            // Deterministic: re-encoding the decoded structure is byte-identical.
+            prop_assert_eq!(reencoded, encoded);
+        }
+    }
+}
