@@ -368,4 +368,35 @@ mod tests {
         ];
         assert_eq!(tbs, expected);
     }
+
+    /// Lowercase hex, to compare against the cose-wg `ToBeSign_hex` strings.
+    #[cfg(feature = "alloc")]
+    fn to_hex(bytes: &[u8]) -> String {
+        bytes.iter().map(|b| format!("{b:02x}")).collect()
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn sig_structure_matches_cose_wg_vectors() {
+        // cose-wg/Examples sign1-tests, ES256 (-7), payload "This is the content.".
+        // The COSE_Sign1 Sig_structure is byte-identical between RFC 8152 and 9052.
+        let payload = b"This is the content.";
+
+        // sign-pass-03: empty external_aad.
+        let tbs = codec::encode(&SigStructure::new(AlgId::new(-7), &[], payload)).expect("encode");
+        assert_eq!(
+            to_hex(&tbs),
+            "846a5369676e61747572653143a101264054546869732069732074686520636f6e74656e742e"
+        );
+
+        // sign-pass-02: external_aad = 11aa22bb33cc44dd55006699.
+        let aad = [
+            0x11, 0xaa, 0x22, 0xbb, 0x33, 0xcc, 0x44, 0xdd, 0x55, 0x00, 0x66, 0x99,
+        ];
+        let tbs = codec::encode(&SigStructure::new(AlgId::new(-7), &aad, payload)).expect("encode");
+        assert_eq!(
+            to_hex(&tbs),
+            "846a5369676e61747572653143a101264c11aa22bb33cc44dd5500669954546869732069732074686520636f6e74656e742e"
+        );
+    }
 }
