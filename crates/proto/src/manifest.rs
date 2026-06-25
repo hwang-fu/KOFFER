@@ -409,4 +409,37 @@ mod tests {
         assert_eq!(decoded, original);
         assert_eq!(codec::encode(&decoded).expect("re-encode"), bytes); // deterministic
     }
+
+    /// Lowercase hex of the encoded bytes, for the frozen-vector comparison.
+    #[cfg(feature = "alloc")]
+    fn to_hex(bytes: &[u8]) -> String {
+        bytes.iter().map(|b| format!("{b:02x}")).collect()
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn matches_frozen_vector() {
+        // Self-consistency vector: a local-profile manifest has no published KAT, so we
+        // freeze a fixed manifest <-> these exact bytes as a determinism/regression guard.
+        // version 1, sequence 42, class_id "acme-rtos", SHA-256 (-16) digests,
+        // target_slot 0, version_string "1.2.3", key_ref "device-root".
+        const KAT_HEX: &str = "a8010102182a036961636d652d72746f7304822f5820aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa05000665312e322e3307822f5820bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb086b6465766963652d726f6f74";
+
+        let class_id = AsciiStr::try_from("acme-rtos").unwrap();
+        let payload_digest = SuitDigest::new(AlgId::new(-16), &[0xAA; 32]);
+        let version_string = AsciiStr::try_from("1.2.3").unwrap();
+        let encrypted_digest = SuitDigest::new(AlgId::new(-16), &[0xBB; 32]);
+        let key_ref = AsciiStr::try_from("device-root").unwrap();
+        let original = Manifest::new(1, 42, class_id, payload_digest, 0)
+            .with_version_string(version_string)
+            .with_encrypted(encrypted_digest, key_ref);
+
+        // Encode direction: the structure produces exactly the frozen bytes.
+        let bytes = codec::encode(&original).expect("encode");
+        assert_eq!(to_hex(&bytes), KAT_HEX);
+
+        // Decode direction: those bytes read back to the same structure.
+        let decoded: Manifest = codec::decode(&bytes).expect("decode");
+        assert_eq!(decoded, original);
+    }
 }
