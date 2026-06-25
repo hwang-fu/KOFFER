@@ -88,6 +88,7 @@ macro_rules! secret_bytes_newtype {
 pub mod aead;
 pub mod alg;
 pub mod error;
+pub mod hybrid;
 pub mod kdf;
 pub mod kem;
 pub mod lms;
@@ -95,6 +96,8 @@ pub mod mldsa;
 pub mod mlkem;
 pub mod profile;
 pub mod sign;
+
+mod x25519;
 
 #[cfg(test)]
 mod kat;
