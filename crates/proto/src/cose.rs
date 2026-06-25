@@ -77,3 +77,57 @@ impl<'b, C> Decode<'b, C> for ProtectedHeader {
         Ok(Self::new(alg))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::codec;
+    use crate::testutil::BYTE_STRING;
+
+    #[test]
+    fn decodes_protected_header_without_alloc() {
+        // bstr(3) wrapping {1: -7}: 0x43 a1 01 26  (-7 is the ES256 codepoint).
+        let wire = [BYTE_STRING | 3, 0xa1, 0x01, 0x26];
+        let ph: ProtectedHeader = codec::decode(&wire).expect("decode");
+        assert_eq!(ph.alg(), AlgId::new(-7));
+    }
+
+    #[test]
+    fn rejects_non_single_entry_map() {
+        // bstr(1) wrapping the empty map {}: 0x41 a0.
+        let wire = [BYTE_STRING | 1, 0xa0];
+        let r: Result<ProtectedHeader, _> = codec::decode(&wire);
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn rejects_trailing_bytes() {
+        // bstr(4) wrapping {1: -7} plus a stray 0x00: 0x44 a1 01 26 00.
+        let wire = [BYTE_STRING | 4, 0xa1, 0x01, 0x26, 0x00];
+        let r: Result<ProtectedHeader, _> = codec::decode(&wire);
+        assert!(r.is_err());
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn encodes_as_bstr_wrapped_map() {
+        let ph = ProtectedHeader::new(AlgId::new(-7));
+        // 0x43 (bstr len 3) then the canonical map a1 01 26.
+        assert_eq!(
+            codec::encode(&ph).expect("encode"),
+            [0x43, 0xa1, 0x01, 0x26]
+        );
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn round_trip_and_deterministic() {
+        for raw in [-7i64, -46, 1, 1000, -65537] {
+            let original = ProtectedHeader::new(AlgId::new(raw));
+            let bytes = codec::encode(&original).expect("encode");
+            let decoded: ProtectedHeader = codec::decode(&bytes).expect("decode");
+            assert_eq!(decoded, original);
+            assert_eq!(codec::encode(&decoded).expect("re-encode"), bytes);
+        }
+    }
+}
