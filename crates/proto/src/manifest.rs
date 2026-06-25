@@ -289,4 +289,18 @@ mod tests {
         assert!(m.encrypted_digest().is_none());
         assert!(m.key_ref().is_none());
     }
+
+    #[test]
+    fn binds_matches_alg_and_bytes() {
+        let class_id = AsciiStr::try_from("acme-rtos").unwrap();
+        let payload_digest = SuitDigest::new(AlgId::new(-16), &[0xAB, 0xCD, 0xEF]);
+        let manifest = Manifest::new(1, 7, class_id, payload_digest, 0);
+
+        // Same algorithm and bytes -> binds.
+        assert!(manifest.binds(SuitDigest::new(AlgId::new(-16), &[0xAB, 0xCD, 0xEF])));
+        // Different bytes -> does not bind.
+        assert!(!manifest.binds(SuitDigest::new(AlgId::new(-16), &[0xAB, 0xCD, 0x00])));
+        // Same bytes, different hash algorithm -> does not bind.
+        assert!(!manifest.binds(SuitDigest::new(AlgId::new(-43), &[0xAB, 0xCD, 0xEF])));
+    }
 }
