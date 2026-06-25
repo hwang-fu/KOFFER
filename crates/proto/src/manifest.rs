@@ -9,6 +9,7 @@
 //! proto frames and parses the bytes; hashing the image and checking the signature
 //! are the crypto / verifier layer's job.
 
+use crate::codec::{Decode, DecodeError, Decoder, Encode, EncodeError, Encoder, Write};
 use crate::{alg::AlgId, ascii::AsciiStr};
 
 /// A SUIT-style digest: the hash algorithm plus the digest bytes (`[alg, bstr]`).
@@ -35,6 +36,31 @@ impl<'b> SuitDigest<'b> {
     /// The digest bytes.
     pub fn bytes(&self) -> &'b [u8] {
         self.bytes
+    }
+}
+
+impl<C> Encode<C> for SuitDigest<'_> {
+    fn encode<W: Write>(
+        &self,
+        e: &mut Encoder<W>,
+        ctx: &mut C,
+    ) -> Result<(), EncodeError<W::Error>> {
+        e.array(2)?;
+        self.alg.encode(e, ctx)?;
+        e.bytes(self.bytes)?.ok()
+    }
+}
+
+impl<'b, C> Decode<'b, C> for SuitDigest<'b> {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, DecodeError> {
+        if d.array()? != Some(2) {
+            return Err(DecodeError::message(
+                "SUIT digest must be a 2-element array",
+            ));
+        }
+        let alg = d.decode()?;
+        let bytes = d.bytes()?;
+        Ok(Self { alg, bytes })
     }
 }
 
