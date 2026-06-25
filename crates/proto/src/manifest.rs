@@ -261,3 +261,32 @@ impl<'b, C> Decode<'b, C> for Manifest<'b> {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::codec;
+
+    #[test]
+    fn decodes_required_only_without_alloc() {
+        // map(5) { 1: 1, 2: 5, 3: "kof", 4: [-16, h'ABCD'], 5: 0 }
+        let wire = [
+            0xa5, // map(5)
+            0x01, 0x01, // version = 1
+            0x02, 0x05, // sequence = 5
+            0x03, 0x63, b'k', b'o', b'f', // class_id = "kof"
+            0x04, 0x82, 0x2f, 0x42, 0xAB, 0xCD, // payload_digest = [-16, h'ABCD']
+            0x05, 0x00, // target_slot = 0
+        ];
+        let m: Manifest = codec::decode(&wire).expect("decode");
+        assert_eq!(m.version(), 1);
+        assert_eq!(m.sequence(), 5);
+        assert_eq!(m.class_id().as_str(), "kof");
+        assert_eq!(m.payload_digest().alg(), AlgId::new(-16));
+        assert_eq!(m.payload_digest().bytes(), &[0xAB, 0xCD]);
+        assert_eq!(m.target_slot(), 0);
+        assert!(m.version_string().is_none());
+        assert!(m.encrypted_digest().is_none());
+        assert!(m.key_ref().is_none());
+    }
+}
