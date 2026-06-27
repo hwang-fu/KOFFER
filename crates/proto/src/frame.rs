@@ -288,3 +288,48 @@ mod tests {
         assert_eq!(v, [0x00, 0x00, 0x00, 0x05, 0x01, 0x02, 0x03, 0x04, 0x05]);
     }
 }
+
+#[cfg(all(test, feature = "alloc"))]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    const CAP: usize = 128;
+    const MAX_BODY: usize = CAP - LEN_PREFIX;
+
+    proptest! {
+        #[test]
+        fn reader_recovers_all_frames(
+            bodies in proptest::collection::vec(
+                proptest::collection::vec(any::<u8>(), 0..=MAX_BODY),
+                0..=8,
+            ),
+            chunk_sizes in proptest::collection::vec(1usize..=40, 1..=32),
+        ) {
+            // One stream holding every framed body, back to back.
+            let mut stream = Vec::new();
+            for body in &bodies {
+                stream.extend_from_slice(&encode(body).unwrap());
+            }
+            // Feed the stream in chunks of the given sizes (cycling), draining frames.
+            let mut reader = FrameReader::<CAP>::new();
+            let mut got: Vec<Vec<u8>> = Vec::new();
+            let mut offset = 0;
+            let mut i = 0;
+            while offset < stream.len() {
+                let size = chunk_sizes[i % chunk_sizes.len()].min(stream.len() - offset);
+                let mut rest = &stream[offset..offset + size];
+                offset += size;
+                i += 1;
+                while !rest.is_empty() {
+                    let n = reader.push(rest).unwrap();
+                    rest = &rest[n..];
+                    while let Some(frame) = reader.next_frame() {
+                        got.push(frame.to_vec());
+                    }
+                }
+            }
+            prop_assert_eq!(got, bodies);
+        }
+    }
+}
