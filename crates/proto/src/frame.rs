@@ -172,6 +172,114 @@ mod tests {
         );
     }
 
+    #[test]
+    fn empty_reader_yields_no_frame() {
+        let mut r = FrameReader::<16>::new();
+        assert!(r.next_frame().is_none());
+    }
+
+    #[test]
+    fn reads_one_frame_from_one_push() {
+        let mut r = FrameReader::<16>::new();
+        let n = r.push(&[0, 0, 0, 3, 0xA0, 0xA1, 0xA2]).unwrap();
+        assert_eq!(n, 7);
+        assert_eq!(r.next_frame(), Some(&[0xA0, 0xA1, 0xA2][..]));
+        assert_eq!(r.next_frame(), None);
+    }
+
+    #[test]
+    fn reassembles_frame_split_across_pushes() {
+        let mut r = FrameReader::<16>::new();
+        r.push(&[0, 0, 0, 3, 0xA0]).unwrap(); // prefix + 1 body byte
+        assert_eq!(r.next_frame(), None); // incomplete
+        r.push(&[0xA1, 0xA2]).unwrap(); // rest of body
+        assert_eq!(r.next_frame(), Some(&[0xA0, 0xA1, 0xA2][..]));
+        assert_eq!(r.next_frame(), None);
+    }
+
+    #[test]
+    fn reads_back_to_back_frames_in_one_push() {
+        let mut r = FrameReader::<16>::new();
+        // body [A0 A1 A2] then body [B0 B1], packed = 13 bytes <= 16
+        let n = r
+            .push(&[0, 0, 0, 3, 0xA0, 0xA1, 0xA2, 0, 0, 0, 2, 0xB0, 0xB1])
+            .unwrap();
+        assert_eq!(n, 13);
+        assert_eq!(r.next_frame(), Some(&[0xA0, 0xA1, 0xA2][..]));
+        assert_eq!(r.next_frame(), Some(&[0xB0, 0xB1][..]));
+        assert_eq!(r.next_frame(), None);
+    }
+
+    #[test]
+    fn reassembles_one_byte_at_a_time() {
+        let mut r = FrameReader::<16>::new();
+        let wire = [0, 0, 0, 3, 0xA0, 0xA1, 0xA2];
+        for (i, b) in wire.iter().enumerate() {
+            r.push(&[*b]).unwrap();
+            if i < wire.len() - 1 {
+                assert!(r.next_frame().is_none());
+            }
+        }
+        assert_eq!(r.next_frame(), Some(&[0xA0, 0xA1, 0xA2][..]));
+    }
+
+    #[test]
+    fn rejects_oversize_frame() {
+        let mut r = FrameReader::<8>::new(); // max body = 4
+        // prefix declares body length 100 -> too large for CAP
+        assert_eq!(r.push(&[0, 0, 0, 100]), Err(FrameError::FrameTooLarge));
+    }
+
+    #[test]
+    fn feeds_more_than_capacity_via_repush() {
+        let mut r = FrameReader::<8>::new(); // holds one small frame at a time
+        // two 6-byte frames = 12 bytes > CAP 8, so push consumes in steps
+        let stream = [0, 0, 0, 2, 0xB0, 0xB1, 0, 0, 0, 2, 0xC0, 0xC1];
+        let mut rest = &stream[..];
+        let mut bodies = [[0u8; 2]; 2];
+        let mut got = 0;
+        while !rest.is_empty() {
+            let n = r.push(rest).unwrap();
+            rest = &rest[n..];
+            while let Some(frame) = r.next_frame() {
+                bodies[got].copy_from_slice(frame);
+                got += 1;
+            }
+        }
+        assert_eq!(got, 2);
+        assert_eq!(bodies, [[0xB0, 0xB1], [0xC0, 0xC1]]);
+    }
+
+    #[test]
+    fn reassembles_at_every_split_point() {
+        // Two frames back-to-back; feed as two chunks split at every offset.
+        let stream = [0, 0, 0, 3, 0xA0, 0xA1, 0xA2, 0, 0, 0, 2, 0xB0, 0xB1];
+        for split in 0..=stream.len() {
+            let mut r = FrameReader::<16>::new();
+            let mut a = [0u8; 3];
+            let mut b = [0u8; 2];
+            let mut got = 0;
+            for chunk in [&stream[..split], &stream[split..]] {
+                let mut rest = chunk;
+                while !rest.is_empty() {
+                    let n = r.push(rest).unwrap();
+                    rest = &rest[n..];
+                    while let Some(frame) = r.next_frame() {
+                        match got {
+                            0 => a.copy_from_slice(frame),
+                            1 => b.copy_from_slice(frame),
+                            _ => panic!("unexpected third frame at split {split}"),
+                        }
+                        got += 1;
+                    }
+                }
+            }
+            assert_eq!(got, 2, "split {split}");
+            assert_eq!(a, [0xA0, 0xA1, 0xA2], "split {split}");
+            assert_eq!(b, [0xB0, 0xB1], "split {split}");
+        }
+    }
+
     #[cfg(feature = "alloc")]
     #[test]
     fn encode_matches_the_framed_layout() {
