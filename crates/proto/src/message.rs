@@ -757,3 +757,44 @@ mod tests {
         );
     }
 }
+
+#[cfg(all(test, feature = "alloc"))]
+mod proptests {
+    use super::*;
+    use crate::codec;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn info_round_trips(
+            fw in proptest::collection::vec(0x20u8..=0x7E, 0..=16),
+            sig in proptest::collection::vec(any::<i64>(), 0..=MAX_ALGS),
+            kem in proptest::collection::vec(any::<i64>(), 0..=MAX_ALGS),
+            keys_present in any::<bool>(),
+            entropy_healthy in any::<bool>(),
+        ) {
+            let fw = String::from_utf8(fw).unwrap();
+            let mut sig_algs = AlgList::new();
+            for a in sig {
+                sig_algs.push(AlgId::new(a)).unwrap();
+            }
+            let mut kem_algs = AlgList::new();
+            for a in kem {
+                kem_algs.push(AlgId::new(a)).unwrap();
+            }
+            let original = Response::Info {
+                fw: AsciiStr::try_from(fw.as_str()).unwrap(),
+                sig_algs,
+                kem_algs,
+                keys_present,
+                entropy_healthy,
+            };
+            let encoded = codec::encode(&original).unwrap();
+            let decoded: Response = codec::decode(&encoded).unwrap();
+            let reencoded = codec::encode(&decoded).unwrap();
+            prop_assert_eq!(decoded, original);
+            // Deterministic: re-encoding the decoded message is byte-identical.
+            prop_assert_eq!(reencoded, encoded);
+        }
+    }
+}
