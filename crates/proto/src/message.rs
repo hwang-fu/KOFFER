@@ -624,4 +624,136 @@ mod tests {
         let r: Result<Request, _> = codec::decode(&wire);
         assert!(r.is_err());
     }
+
+    /// Lowercase hex of the encoded bytes, for the frozen-vector comparisons.
+    #[cfg(feature = "alloc")]
+    fn to_hex(bytes: &[u8]) -> String {
+        bytes.iter().map(|b| format!("{b:02x}")).collect()
+    }
+
+    #[cfg(feature = "alloc")]
+    fn check_request_kat(msg: Request, expected_hex: &str) {
+        let bytes = codec::encode(&msg).expect("encode");
+        assert_eq!(to_hex(&bytes), expected_hex);
+        let decoded: Request = codec::decode(&bytes).expect("decode");
+        assert_eq!(decoded, msg);
+    }
+
+    #[cfg(feature = "alloc")]
+    fn check_response_kat(msg: Response, expected_hex: &str) {
+        let bytes = codec::encode(&msg).expect("encode");
+        assert_eq!(to_hex(&bytes), expected_hex);
+        let decoded: Response = codec::decode(&bytes).expect("decode");
+        assert_eq!(decoded, msg);
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn request_kats() {
+        check_request_kat(Request::GetInfo, "8102");
+        check_request_kat(
+            Request::InitKeys {
+                sig_alg: AlgId::new(-7),
+                kem_alg: AlgId::new(-48),
+            },
+            "830326382f",
+        );
+        let dbytes = [0xAA, 0xBB, 0xCC, 0xDD];
+        check_request_kat(
+            Request::Sign {
+                alg: AlgId::new(-7),
+                digest: SuitDigest::new(AlgId::new(-16), &dbytes),
+                summary: AsciiStr::try_from("sign").unwrap(),
+            },
+            "840426822f44aabbccdd647369676e",
+        );
+        let mdig = [0xAB, 0xCD];
+        let manifest = Manifest::new(
+            1,
+            1,
+            AsciiStr::try_from("kof").unwrap(),
+            SuitDigest::new(AlgId::new(-16), &mdig),
+            0,
+        );
+        let ct = [0xCD, 0xCE];
+        check_request_kat(
+            Request::InstallEncryptedImage {
+                kem_alg: AlgId::new(-48),
+                ciphertext: &ct,
+                manifest,
+            },
+            "8405382f42cdcea50101020103636b6f6604822f42abcd0500",
+        );
+        let nonce = [0x99, 0x88];
+        check_request_kat(Request::Attest { nonce: &nonce }, "8206429988");
+        let hp = [0x01, 0x02];
+        check_request_kat(Request::Handshake { payload: &hp }, "8201420102");
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn response_kats() {
+        use crate::cose::Payload;
+        let mut sig_algs = AlgList::new();
+        sig_algs.push(AlgId::new(-7)).unwrap();
+        let mut kem_algs = AlgList::new();
+        kem_algs.push(AlgId::new(-48)).unwrap();
+        check_response_kat(
+            Response::Info {
+                fw: AsciiStr::try_from("kof").unwrap(),
+                sig_algs,
+                kem_algs,
+                keys_present: true,
+                entropy_healthy: false,
+            },
+            "8601636b6f66812681382ff5f4",
+        );
+        let spk = [0x11, 0x22];
+        let kpk = [0x33, 0x44];
+        check_response_kat(
+            Response::PublicKeys {
+                sig_alg: AlgId::new(-7),
+                sig_public_key: &spk,
+                kem_alg: AlgId::new(-48),
+                kem_public_key: &kpk,
+            },
+            "850226421122382f423344",
+        );
+        let sig1 = [0xAB, 0xCD];
+        check_response_kat(
+            Response::CoseSign1(CoseSign1::new(
+                AlgId::new(-7),
+                Some(AsciiStr::try_from("kid").unwrap()),
+                Payload::Detached,
+                &sig1,
+            )),
+            "82038443a10126a104636b6964f642abcd",
+        );
+        let meas = [0x77, 0x88];
+        check_response_kat(
+            Response::BootDecision {
+                accepted: true,
+                measurement: &meas,
+            },
+            "8304f5427788",
+        );
+        let amsg = [0x33];
+        let asig = [0xCD];
+        check_response_kat(
+            Response::Attestation(CoseSign1::new(
+                AlgId::new(-49),
+                Some(AsciiStr::try_from("kid").unwrap()),
+                Payload::Attached(&amsg),
+                &asig,
+            )),
+            "82058444a1013830a104636b6964413341cd",
+        );
+        check_response_kat(
+            Response::Error {
+                code: ErrorCode::Malformed,
+                detail: AsciiStr::try_from("bad").unwrap(),
+            },
+            "83060163626164",
+        );
+    }
 }
