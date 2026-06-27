@@ -236,3 +236,29 @@ fn decode_alg_list(d: &mut Decoder<'_>) -> Result<AlgList, DecodeError> {
     }
     Ok(list)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::codec;
+
+    #[test]
+    fn decodes_get_info_without_alloc() {
+        let wire = [0x81, REQ_GET_INFO]; // array(1) [ tag ]
+        let r: Request = codec::decode(&wire).expect("decode");
+        assert_eq!(r, Request::GetInfo);
+    }
+
+    #[test]
+    fn decodes_init_keys_without_alloc() {
+        let wire = [0x83, REQ_INIT_KEYS, 0x01, 0x02]; // array(3) [ tag, 1, 2 ]
+        let r: Request = codec::decode(&wire).expect("decode");
+        assert_eq!(
+            r,
+            Request::InitKeys {
+                sig_alg: AlgId::new(1),
+                kem_alg: AlgId::new(2),
+            }
+        );
+    }
+}
