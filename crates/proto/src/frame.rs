@@ -56,3 +56,33 @@ pub fn encode(body: &[u8]) -> Result<Vec<u8>, FrameError> {
     out.extend_from_slice(body);
     Ok(out)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn encode_into_writes_length_prefixed_frame() {
+        let mut out = [0u8; 16];
+        let n = encode_into(&[0xAA, 0xBB, 0xCC], &mut out).expect("encode");
+        assert_eq!(n, 7);
+        assert_eq!(&out[..n], &[0x00, 0x00, 0x00, 0x03, 0xAA, 0xBB, 0xCC]);
+    }
+
+    #[test]
+    fn encode_into_rejects_small_buffer() {
+        let mut out = [0u8; 6]; // a 3-byte body needs 7
+        assert_eq!(
+            encode_into(&[0xAA, 0xBB, 0xCC], &mut out),
+            Err(FrameError::BufferTooSmall)
+        );
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn encode_matches_the_framed_layout() {
+        let body = [0x01, 0x02, 0x03, 0x04, 0x05];
+        let v = encode(&body).expect("encode");
+        assert_eq!(v, [0x00, 0x00, 0x00, 0x05, 0x01, 0x02, 0x03, 0x04, 0x05]);
+    }
+}
