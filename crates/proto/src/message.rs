@@ -261,4 +261,28 @@ mod tests {
             }
         );
     }
+
+    #[test]
+    fn rejects_unknown_request_tag() {
+        let wire = [0x81, 0x09]; // array(1), unknown tag 9
+        let r: Result<Request, _> = codec::decode(&wire);
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn rejects_wrong_request_array_length() {
+        let wire = [0x82, REQ_INIT_KEYS, 0x01]; // InitKeys tag but array(2)
+        let r: Result<Request, _> = codec::decode(&wire);
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn rejects_non_ascii_error_detail() {
+        let wire = [
+            0x83, RESP_ERROR, 0x01, // array(3), Error tag, code 1
+            0x65, 0x63, 0x61, 0x66, 0xc3, 0xa9, // detail = "café"
+        ];
+        let r: Result<Response, _> = codec::decode(&wire);
+        assert!(r.is_err());
+    }
 }
