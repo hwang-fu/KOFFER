@@ -17,6 +17,11 @@ use crate::{
 const REQ_GET_INFO: u8 = 2;
 const REQ_INIT_KEYS: u8 = 3;
 
+// Response tags (device -> host).
+const RESP_INFO: u8 = 1;
+const RESP_PUBLIC_KEYS: u8 = 2;
+const RESP_ERROR: u8 = 6;
+
 /// Maximum number of algorithm identifiers carried in an `Info` list.
 pub const MAX_ALGS: usize = 8;
 
@@ -107,6 +112,93 @@ pub enum Response<'b> {
         /// A human-readable detail string (may be empty).
         detail: AsciiStr<'b>,
     },
+}
+
+impl<C> Encode<C> for Response<'_> {
+    fn encode<W: Write>(
+        &self,
+        e: &mut Encoder<W>,
+        ctx: &mut C,
+    ) -> Result<(), EncodeError<W::Error>> {
+        match self {
+            Response::Info {
+                fw,
+                sig_algs,
+                kem_algs,
+                keys_present,
+                entropy_healthy,
+            } => {
+                e.array(6)?.u8(RESP_INFO)?;
+                fw.encode(e, ctx)?;
+                encode_alg_list(e, sig_algs, ctx)?;
+                encode_alg_list(e, kem_algs, ctx)?;
+                e.bool(*keys_present)?.bool(*entropy_healthy)?;
+            }
+            Response::PublicKeys {
+                sig_alg,
+                sig_public_key,
+                kem_alg,
+                kem_public_key,
+            } => {
+                e.array(5)?.u8(RESP_PUBLIC_KEYS)?;
+                sig_alg.encode(e, ctx)?;
+                e.bytes(sig_public_key)?;
+                kem_alg.encode(e, ctx)?;
+                e.bytes(kem_public_key)?;
+            }
+            Response::Error { code, detail } => {
+                e.array(3)?.u8(RESP_ERROR)?;
+                code.encode(e, ctx)?;
+                detail.encode(e, ctx)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl<'b, C> Decode<'b, C> for Response<'b> {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, DecodeError> {
+        let len = d
+            .array()?
+            .ok_or_else(|| DecodeError::message("response must be a definite array"))?;
+        match d.u8()? {
+            RESP_INFO => {
+                expect_len(len, 6)?;
+                let fw = d.decode()?;
+                let sig_algs = decode_alg_list(d)?;
+                let kem_algs = decode_alg_list(d)?;
+                let keys_present = d.bool()?;
+                let entropy_healthy = d.bool()?;
+                Ok(Response::Info {
+                    fw,
+                    sig_algs,
+                    kem_algs,
+                    keys_present,
+                    entropy_healthy,
+                })
+            }
+            RESP_PUBLIC_KEYS => {
+                expect_len(len, 5)?;
+                let sig_alg = d.decode()?;
+                let sig_public_key = d.bytes()?;
+                let kem_alg = d.decode()?;
+                let kem_public_key = d.bytes()?;
+                Ok(Response::PublicKeys {
+                    sig_alg,
+                    sig_public_key,
+                    kem_alg,
+                    kem_public_key,
+                })
+            }
+            RESP_ERROR => {
+                expect_len(len, 3)?;
+                let code = d.decode()?;
+                let detail = d.decode()?;
+                Ok(Response::Error { code, detail })
+            }
+            _ => Err(DecodeError::message("unknown response tag")),
+        }
+    }
 }
 
 /// Checks that a tagged message's array length matches the variant's arity.
