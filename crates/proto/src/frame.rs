@@ -37,6 +37,88 @@ impl core::fmt::Display for FrameError {
 
 impl core::error::Error for FrameError {}
 
+/// Reassembles length-delimited frames from a USB byte stream into complete frames.
+///
+/// Holds a fixed `[u8; CAP]` buffer (no heap); `CAP` is the largest total frame -- prefix
+/// plus body -- it accepts. Feed stream bytes with [`push`](Self::push) and drain complete
+/// frames with [`next_frame`](Self::next_frame). An incoming frame whose declared length
+/// exceeds `CAP` is rejected (`FrameTooLarge`) the moment the prefix is read, so a bogus
+/// length never causes unbounded buffering. `CAP` must exceed the largest expected frame.
+pub struct FrameReader<const CAP: usize> {
+    buf: [u8; CAP],
+    /// Valid buffered bytes, at `buf[..len]`.
+    len: usize,
+    /// Length of a frame returned by `next_frame` but not yet compacted out (0 = none).
+    pending: usize,
+}
+
+impl<const CAP: usize> Default for FrameReader<CAP> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<const CAP: usize> FrameReader<CAP> {
+    /// Creates an empty reader.
+    pub const fn new() -> Self {
+        Self {
+            buf: [0u8; CAP],
+            len: 0,
+            pending: 0,
+        }
+    }
+
+    /// Feeds stream bytes, buffering as many as fit, and returns how many were consumed.
+    ///
+    /// Stops at the buffer's free space, so a feed larger than the remaining room is
+    /// taken in part -- drain with `next_frame`, then push the rest. Rejects a frame
+    /// whose declared length exceeds `CAP`.
+    pub fn push(&mut self, data: &[u8]) -> Result<usize, FrameError> {
+        self.compact();
+        let take = (CAP - self.len).min(data.len());
+        self.buf[self.len..self.len + take].copy_from_slice(&data[..take]);
+        self.len += take;
+        if self.len >= LEN_PREFIX && self.body_len() > CAP.saturating_sub(LEN_PREFIX) {
+            return Err(FrameError::FrameTooLarge);
+        }
+        Ok(take)
+    }
+
+    /// Returns the next complete frame's body, or `None` if one has not fully arrived.
+    ///
+    /// The returned slice borrows the reader's buffer; it is valid until the next call
+    /// to `push` or `next_frame`.
+    pub fn next_frame(&mut self) -> Option<&[u8]> {
+        self.compact();
+        if self.len < LEN_PREFIX {
+            return None;
+        }
+        let total = LEN_PREFIX + self.body_len();
+        if self.len < total {
+            return None;
+        }
+        self.pending = total;
+        Some(&self.buf[LEN_PREFIX..total])
+    }
+
+    /// Drops a previously returned frame by shifting the remaining bytes to the front.
+    fn compact(&mut self) {
+        if self.pending > 0 {
+            self.buf.copy_within(self.pending..self.len, 0);
+            self.len -= self.pending;
+            self.pending = 0;
+        }
+    }
+
+    /// The body length declared by the buffered 4-byte prefix. Only valid when `len >= LEN_PREFIX`.
+    fn body_len(&self) -> usize {
+        let prefix: [u8; LEN_PREFIX] = self.buf[..LEN_PREFIX]
+            .try_into()
+            .expect("slice is LEN_PREFIX bytes");
+        u32::from_be_bytes(prefix) as usize
+    }
+}
+
 /// Writes `len(u32 big-endian) || body` into `out`, returning the total frame length.
 ///
 /// The length prefix counts only the body, not itself. Fails if `out` cannot hold the
