@@ -14,13 +14,15 @@ use alloc::vec::Vec;
 /// Width of the big-endian length prefix, in bytes.
 pub const LEN_PREFIX: usize = 4;
 
-/// Error from framing a body into bytes.
+/// Error from framing or reassembling bytes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FrameError {
     /// The output buffer cannot hold `LEN_PREFIX + body.len()` bytes.
     BufferTooSmall,
     /// The body is longer than the `u32` length prefix can describe.
     TooLong,
+    /// An incoming frame's declared length exceeds the reader's capacity.
+    FrameTooLarge,
 }
 
 impl core::fmt::Display for FrameError {
@@ -28,6 +30,7 @@ impl core::fmt::Display for FrameError {
         match self {
             FrameError::BufferTooSmall => f.write_str("output buffer too small for the frame"),
             FrameError::TooLong => f.write_str("frame body exceeds the u32 length prefix"),
+            FrameError::FrameTooLarge => f.write_str("incoming frame exceeds the reader capacity"),
         }
     }
 }
