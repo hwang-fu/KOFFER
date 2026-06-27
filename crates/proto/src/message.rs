@@ -481,6 +481,48 @@ mod tests {
 
     #[cfg(feature = "alloc")]
     #[test]
+    fn request_handshake_round_trips() {
+        let payload = [0x01, 0x02, 0x03, 0x04];
+        round_trip_request(Request::Handshake { payload: &payload });
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn request_sign_round_trips() {
+        let digest_bytes = [0x55u8; 32];
+        let digest = SuitDigest::new(AlgId::new(-16), &digest_bytes);
+        let summary = AsciiStr::try_from("sign firmware v2").unwrap();
+        round_trip_request(Request::Sign {
+            alg: AlgId::new(-7),
+            digest,
+            summary,
+        });
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn request_install_encrypted_image_round_trips() {
+        let class_id = AsciiStr::try_from("acme-rtos").unwrap();
+        let digest_bytes = [0x11u8; 32];
+        let payload_digest = SuitDigest::new(AlgId::new(-16), &digest_bytes);
+        let manifest = Manifest::new(1, 7, class_id, payload_digest, 0);
+        let ciphertext = [0xCDu8; 48];
+        round_trip_request(Request::InstallEncryptedImage {
+            kem_alg: AlgId::new(-48),
+            ciphertext: &ciphertext,
+            manifest,
+        });
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn request_attest_round_trips() {
+        let nonce = [0x99u8; 16];
+        round_trip_request(Request::Attest { nonce: &nonce });
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
     fn response_info_round_trips() {
         let fw = AsciiStr::try_from("koffer 0.1").unwrap();
         let mut sig_algs = AlgList::new();
