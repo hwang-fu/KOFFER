@@ -297,4 +297,27 @@ mod tests {
         let mut d = Decoder::new(&wire);
         assert!(decode_alg_list(&mut d).is_err());
     }
+
+    #[cfg(feature = "alloc")]
+    fn round_trip_request(original: Request) {
+        let bytes = codec::encode(&original).expect("encode");
+        let decoded: Request = codec::decode(&bytes).expect("decode");
+        assert_eq!(decoded, original);
+        assert_eq!(codec::encode(&decoded).expect("re-encode"), bytes); // deterministic
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn request_get_info_round_trips() {
+        round_trip_request(Request::GetInfo);
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn request_init_keys_round_trips() {
+        round_trip_request(Request::InitKeys {
+            sig_alg: AlgId::new(-7),
+            kem_alg: AlgId::new(-48),
+        });
+    }
 }
