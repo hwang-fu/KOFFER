@@ -561,4 +561,43 @@ mod tests {
             detail,
         });
     }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn response_cose_sign1_round_trips() {
+        use crate::cose::Payload;
+        let kid = AsciiStr::try_from("device-root").unwrap();
+        let signature = [0xABu8; 64];
+        round_trip_response(Response::CoseSign1(CoseSign1::new(
+            AlgId::new(-7),
+            Some(kid),
+            Payload::Detached,
+            &signature,
+        )));
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn response_boot_decision_round_trips() {
+        let measurement = [0x77u8; 32];
+        round_trip_response(Response::BootDecision {
+            accepted: true,
+            measurement: &measurement,
+        });
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn response_attestation_round_trips() {
+        use crate::cose::Payload;
+        let kid = AsciiStr::try_from("endorsement").unwrap();
+        let measurement = [0x33u8; 20];
+        let signature = [0xCDu8; 64];
+        round_trip_response(Response::Attestation(CoseSign1::new(
+            AlgId::new(-49),
+            Some(kid),
+            Payload::Attached(&measurement),
+            &signature,
+        )));
+    }
 }
