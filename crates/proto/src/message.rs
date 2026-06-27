@@ -285,4 +285,16 @@ mod tests {
         let r: Result<Response, _> = codec::decode(&wire);
         assert!(r.is_err());
     }
+
+    #[test]
+    fn alg_list_decode_rejects_overflow() {
+        // A CBOR array of MAX_ALGS + 1 small-integer ids.
+        let mut wire = [0u8; 1 + (MAX_ALGS + 1)];
+        wire[0] = 0x80 | (MAX_ALGS as u8 + 1);
+        for i in 0..=MAX_ALGS {
+            wire[1 + i] = i as u8;
+        }
+        let mut d = Decoder::new(&wire);
+        assert!(decode_alg_list(&mut d).is_err());
+    }
 }
