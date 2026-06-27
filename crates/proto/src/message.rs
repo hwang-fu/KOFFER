@@ -10,6 +10,7 @@ use crate::{
     alg::AlgId,
     ascii::AsciiStr,
     codec::{Decode, DecodeError, Decoder, Encode, EncodeError, Encoder, Write},
+    cose::CoseSign1,
     error::ErrorCode,
     manifest::{Manifest, SuitDigest},
 };
@@ -25,6 +26,9 @@ const REQ_ATTEST: u8 = 6;
 // Response tags (device -> host).
 const RESP_INFO: u8 = 1;
 const RESP_PUBLIC_KEYS: u8 = 2;
+const RESP_COSE_SIGN1: u8 = 3;
+const RESP_BOOT_DECISION: u8 = 4;
+const RESP_ATTESTATION: u8 = 5;
 const RESP_ERROR: u8 = 6;
 
 /// Maximum number of algorithm identifiers carried in an `Info` list.
@@ -193,6 +197,17 @@ pub enum Response<'b> {
         /// The KEM public key bytes.
         kem_public_key: &'b [u8],
     },
+    /// A signed message (the `Sign` reply).
+    CoseSign1(CoseSign1<'b>),
+    /// The outcome of an encrypted-image install (the `InstallEncryptedImage` reply).
+    BootDecision {
+        /// Whether the image was accepted and booted.
+        accepted: bool,
+        /// A measurement of the installed image.
+        measurement: &'b [u8],
+    },
+    /// A signed attestation over the challenge nonce (the `Attest` reply).
+    Attestation(CoseSign1<'b>),
     /// An error reply.
     Error {
         /// The error code.
@@ -233,6 +248,22 @@ impl<C> Encode<C> for Response<'_> {
                 e.bytes(sig_public_key)?;
                 kem_alg.encode(e, ctx)?;
                 e.bytes(kem_public_key)?;
+            }
+            Response::CoseSign1(sig) => {
+                e.array(2)?.u8(RESP_COSE_SIGN1)?;
+                sig.encode(e, ctx)?;
+            }
+            Response::BootDecision {
+                accepted,
+                measurement,
+            } => {
+                e.array(3)?.u8(RESP_BOOT_DECISION)?;
+                e.bool(*accepted)?;
+                e.bytes(measurement)?;
+            }
+            Response::Attestation(att) => {
+                e.array(2)?.u8(RESP_ATTESTATION)?;
+                att.encode(e, ctx)?;
             }
             Response::Error { code, detail } => {
                 e.array(3)?.u8(RESP_ERROR)?;
@@ -277,6 +308,25 @@ impl<'b, C> Decode<'b, C> for Response<'b> {
                     kem_alg,
                     kem_public_key,
                 })
+            }
+            RESP_COSE_SIGN1 => {
+                expect_len(len, 2)?;
+                let sig = d.decode()?;
+                Ok(Response::CoseSign1(sig))
+            }
+            RESP_BOOT_DECISION => {
+                expect_len(len, 3)?;
+                let accepted = d.bool()?;
+                let measurement = d.bytes()?;
+                Ok(Response::BootDecision {
+                    accepted,
+                    measurement,
+                })
+            }
+            RESP_ATTESTATION => {
+                expect_len(len, 2)?;
+                let att = d.decode()?;
+                Ok(Response::Attestation(att))
             }
             RESP_ERROR => {
                 expect_len(len, 3)?;
