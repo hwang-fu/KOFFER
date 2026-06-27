@@ -401,6 +401,18 @@ mod tests {
     }
 
     #[test]
+    fn decodes_attest_without_alloc() {
+        let wire = [0x82, REQ_ATTEST, 0x43, 0xAA, 0xBB, 0xCC]; // array(2) [ tag, h'AABBCC' ]
+        let r: Request = codec::decode(&wire).expect("decode");
+        assert_eq!(
+            r,
+            Request::Attest {
+                nonce: &[0xAA, 0xBB, 0xCC],
+            }
+        );
+    }
+
+    #[test]
     fn rejects_unknown_request_tag() {
         let wire = [0x81, 0x09]; // array(1), unknown tag 9
         let r: Result<Request, _> = codec::decode(&wire);
