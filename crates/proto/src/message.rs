@@ -9,9 +9,13 @@
 use crate::{
     alg::AlgId,
     ascii::AsciiStr,
-    codec::{DecodeError, Decoder, Encode, EncodeError, Encoder, Write},
+    codec::{Decode, DecodeError, Decoder, Encode, EncodeError, Encoder, Write},
     error::ErrorCode,
 };
+
+// Request tags (host -> device).
+const REQ_GET_INFO: u8 = 2;
+const REQ_INIT_KEYS: u8 = 3;
 
 /// Maximum number of algorithm identifiers carried in an `Info` list.
 pub const MAX_ALGS: usize = 8;
@@ -26,6 +30,47 @@ pub enum Request {
     GetInfo,
     /// Generate the signing and KEM key pairs (`-> Response::PublicKeys`).
     InitKeys { sig_alg: AlgId, kem_alg: AlgId },
+}
+
+impl<C> Encode<C> for Request {
+    fn encode<W: Write>(
+        &self,
+        e: &mut Encoder<W>,
+        ctx: &mut C,
+    ) -> Result<(), EncodeError<W::Error>> {
+        match self {
+            Request::GetInfo => {
+                e.array(1)?.u8(REQ_GET_INFO)?;
+            }
+            Request::InitKeys { sig_alg, kem_alg } => {
+                e.array(3)?.u8(REQ_INIT_KEYS)?;
+                sig_alg.encode(e, ctx)?;
+                kem_alg.encode(e, ctx)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl<'b, C> Decode<'b, C> for Request {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, DecodeError> {
+        let len = d
+            .array()?
+            .ok_or_else(|| DecodeError::message("request must be a definite array"))?;
+        match d.u8()? {
+            REQ_GET_INFO => {
+                expect_len(len, 1)?;
+                Ok(Request::GetInfo)
+            }
+            REQ_INIT_KEYS => {
+                expect_len(len, 3)?;
+                let sig_alg = d.decode()?;
+                let kem_alg = d.decode()?;
+                Ok(Request::InitKeys { sig_alg, kem_alg })
+            }
+            _ => Err(DecodeError::message("unknown request tag")),
+        }
+    }
 }
 
 /// A response from device to host.
