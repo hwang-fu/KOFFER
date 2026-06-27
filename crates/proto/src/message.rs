@@ -307,6 +307,14 @@ mod tests {
     }
 
     #[cfg(feature = "alloc")]
+    fn round_trip_response(original: Response) {
+        let bytes = codec::encode(&original).expect("encode");
+        let decoded: Response = codec::decode(&bytes).expect("decode");
+        assert_eq!(decoded, original);
+        assert_eq!(codec::encode(&decoded).expect("re-encode"), bytes); // deterministic
+    }
+
+    #[cfg(feature = "alloc")]
     #[test]
     fn request_get_info_round_trips() {
         round_trip_request(Request::GetInfo);
@@ -318,6 +326,47 @@ mod tests {
         round_trip_request(Request::InitKeys {
             sig_alg: AlgId::new(-7),
             kem_alg: AlgId::new(-48),
+        });
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn response_info_round_trips() {
+        let fw = AsciiStr::try_from("koffer 0.1").unwrap();
+        let mut sig_algs = AlgList::new();
+        sig_algs.push(AlgId::new(-7)).unwrap();
+        let mut kem_algs = AlgList::new();
+        kem_algs.push(AlgId::new(-48)).unwrap();
+        kem_algs.push(AlgId::new(-49)).unwrap();
+        round_trip_response(Response::Info {
+            fw,
+            sig_algs,
+            kem_algs,
+            keys_present: true,
+            entropy_healthy: true,
+        });
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn response_public_keys_round_trips() {
+        let sig_pk = [0x11u8; 32];
+        let kem_pk = [0x22u8; 16];
+        round_trip_response(Response::PublicKeys {
+            sig_alg: AlgId::new(-7),
+            sig_public_key: &sig_pk,
+            kem_alg: AlgId::new(-48),
+            kem_public_key: &kem_pk,
+        });
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn response_error_round_trips() {
+        let detail = AsciiStr::try_from("bad request").unwrap();
+        round_trip_response(Response::Error {
+            code: ErrorCode::Malformed,
+            detail,
         });
     }
 }
