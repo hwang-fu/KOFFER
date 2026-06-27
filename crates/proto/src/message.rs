@@ -13,3 +13,12 @@ pub const MAX_ALGS: usize = 8;
 
 /// A bounded, heap-free list of algorithm identifiers.
 pub type AlgList = heapless::Vec<AlgId, MAX_ALGS>;
+
+/// A request from host to device.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Request {
+    /// Report device capabilities (`-> Response::Info`).
+    GetInfo,
+    /// Generate the signing and KEM key pairs (`-> Response::PublicKeys`).
+    InitKeys { sig_alg: AlgId, kem_alg: AlgId },
+}
