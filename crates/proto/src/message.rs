@@ -6,7 +6,12 @@
 //! Text fields are printable-ASCII (F15); byte fields borrow the input, zero-copy, like
 //! the COSE and manifest types.
 
-use crate::{alg::AlgId, ascii::AsciiStr, error::ErrorCode};
+use crate::{
+    alg::AlgId,
+    ascii::AsciiStr,
+    codec::{DecodeError, Decoder, Encode, EncodeError, Encoder, Write},
+    error::ErrorCode,
+};
 
 /// Maximum number of algorithm identifiers carried in an `Info` list.
 pub const MAX_ALGS: usize = 8;
@@ -57,4 +62,40 @@ pub enum Response<'b> {
         /// A human-readable detail string (may be empty).
         detail: AsciiStr<'b>,
     },
+}
+
+/// Checks that a tagged message's array length matches the variant's arity.
+fn expect_len(actual: u64, expected: u64) -> Result<(), DecodeError> {
+    if actual == expected {
+        Ok(())
+    } else {
+        Err(DecodeError::message("message array has the wrong length"))
+    }
+}
+
+/// Encodes an algorithm list as a definite CBOR array of identifiers.
+fn encode_alg_list<C, W: Write>(
+    e: &mut Encoder<W>,
+    list: &AlgList,
+    ctx: &mut C,
+) -> Result<(), EncodeError<W::Error>> {
+    e.array(list.len() as u64)?;
+    for alg in list {
+        alg.encode(e, ctx)?;
+    }
+    Ok(())
+}
+
+/// Decodes a definite CBOR array of algorithm identifiers, rejecting overflow past `MAX_ALGS`.
+fn decode_alg_list(d: &mut Decoder<'_>) -> Result<AlgList, DecodeError> {
+    let len = d
+        .array()?
+        .ok_or_else(|| DecodeError::message("algorithm list must be a definite array"))?;
+    let mut list = AlgList::new();
+    for _ in 0..len {
+        let alg: AlgId = d.decode()?;
+        list.push(alg)
+            .map_err(|_| DecodeError::message("too many algorithms in list"))?;
+    }
+    Ok(list)
 }
