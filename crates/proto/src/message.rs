@@ -11,11 +11,16 @@ use crate::{
     ascii::AsciiStr,
     codec::{Decode, DecodeError, Decoder, Encode, EncodeError, Encoder, Write},
     error::ErrorCode,
+    manifest::{Manifest, SuitDigest},
 };
 
 // Request tags (host -> device).
+const REQ_HANDSHAKE: u8 = 1;
 const REQ_GET_INFO: u8 = 2;
 const REQ_INIT_KEYS: u8 = 3;
+const REQ_SIGN: u8 = 4;
+const REQ_INSTALL_IMAGE: u8 = 5;
+const REQ_ATTEST: u8 = 6;
 
 // Response tags (device -> host).
 const RESP_INFO: u8 = 1;
@@ -30,20 +35,47 @@ pub type AlgList = heapless::Vec<AlgId, MAX_ALGS>;
 
 /// A request from host to device.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Request {
+pub enum Request<'b> {
+    /// Channel-setup handshake message (placeholder; the secure-channel handshake
+    /// logic is implemented later).
+    Handshake { payload: &'b [u8] },
     /// Report device capabilities (`-> Response::Info`).
     GetInfo,
     /// Generate the signing and KEM key pairs (`-> Response::PublicKeys`).
     InitKeys { sig_alg: AlgId, kem_alg: AlgId },
+    /// Sign a digest with the given algorithm (`-> Response::CoseSign1`).
+    Sign {
+        /// Signature algorithm to use.
+        alg: AlgId,
+        /// The digest to sign.
+        digest: SuitDigest<'b>,
+        /// Human-readable summary shown on the device display for consent.
+        summary: AsciiStr<'b>,
+    },
+    /// Install an encrypted firmware image (`-> Response::BootDecision`).
+    InstallEncryptedImage {
+        /// KEM algorithm of the wrapped content key.
+        kem_alg: AlgId,
+        /// The AEAD-encrypted image.
+        ciphertext: &'b [u8],
+        /// The signed manifest binding the image.
+        manifest: Manifest<'b>,
+    },
+    /// Request a signed attestation over a challenge nonce (`-> Response::Attestation`).
+    Attest { nonce: &'b [u8] },
 }
 
-impl<C> Encode<C> for Request {
+impl<C> Encode<C> for Request<'_> {
     fn encode<W: Write>(
         &self,
         e: &mut Encoder<W>,
         ctx: &mut C,
     ) -> Result<(), EncodeError<W::Error>> {
         match self {
+            Request::Handshake { payload } => {
+                e.array(2)?.u8(REQ_HANDSHAKE)?;
+                e.bytes(payload)?;
+            }
             Request::GetInfo => {
                 e.array(1)?.u8(REQ_GET_INFO)?;
             }
@@ -52,17 +84,46 @@ impl<C> Encode<C> for Request {
                 sig_alg.encode(e, ctx)?;
                 kem_alg.encode(e, ctx)?;
             }
+            Request::Sign {
+                alg,
+                digest,
+                summary,
+            } => {
+                e.array(4)?.u8(REQ_SIGN)?;
+                alg.encode(e, ctx)?;
+                digest.encode(e, ctx)?;
+                summary.encode(e, ctx)?;
+            }
+            Request::InstallEncryptedImage {
+                kem_alg,
+                ciphertext,
+                manifest,
+            } => {
+                e.array(4)?.u8(REQ_INSTALL_IMAGE)?;
+                kem_alg.encode(e, ctx)?;
+                e.bytes(ciphertext)?;
+                manifest.encode(e, ctx)?;
+            }
+            Request::Attest { nonce } => {
+                e.array(2)?.u8(REQ_ATTEST)?;
+                e.bytes(nonce)?;
+            }
         }
         Ok(())
     }
 }
 
-impl<'b, C> Decode<'b, C> for Request {
+impl<'b, C> Decode<'b, C> for Request<'b> {
     fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, DecodeError> {
         let len = d
             .array()?
             .ok_or_else(|| DecodeError::message("request must be a definite array"))?;
         match d.u8()? {
+            REQ_HANDSHAKE => {
+                expect_len(len, 2)?;
+                let payload = d.bytes()?;
+                Ok(Request::Handshake { payload })
+            }
             REQ_GET_INFO => {
                 expect_len(len, 1)?;
                 Ok(Request::GetInfo)
@@ -72,6 +133,33 @@ impl<'b, C> Decode<'b, C> for Request {
                 let sig_alg = d.decode()?;
                 let kem_alg = d.decode()?;
                 Ok(Request::InitKeys { sig_alg, kem_alg })
+            }
+            REQ_SIGN => {
+                expect_len(len, 4)?;
+                let alg = d.decode()?;
+                let digest = d.decode()?;
+                let summary = d.decode()?;
+                Ok(Request::Sign {
+                    alg,
+                    digest,
+                    summary,
+                })
+            }
+            REQ_INSTALL_IMAGE => {
+                expect_len(len, 4)?;
+                let kem_alg = d.decode()?;
+                let ciphertext = d.bytes()?;
+                let manifest = d.decode()?;
+                Ok(Request::InstallEncryptedImage {
+                    kem_alg,
+                    ciphertext,
+                    manifest,
+                })
+            }
+            REQ_ATTEST => {
+                expect_len(len, 2)?;
+                let nonce = d.bytes()?;
+                Ok(Request::Attest { nonce })
             }
             _ => Err(DecodeError::message("unknown request tag")),
         }
