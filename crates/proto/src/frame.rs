@@ -119,6 +119,15 @@ impl<const CAP: usize> FrameReader<CAP> {
     }
 }
 
+impl<const CAP: usize> core::fmt::Debug for FrameReader<CAP> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("FrameReader")
+            .field("cap", &CAP)
+            .field("buffered", &self.len)
+            .finish()
+    }
+}
+
 /// Writes `len(u32 big-endian) || body` into `out`, returning the total frame length.
 ///
 /// The length prefix counts only the body, not itself. Fails if `out` cannot hold the
