@@ -336,3 +336,26 @@ pub fn our_lms_verify(public_key: &[u8], message: &[u8], signature: &[u8]) -> bo
         .verify(&key, message, &sig)
         .is_ok()
 }
+
+/// Runs our backend and `reference` on the same LMS verify input and compares them.
+///
+/// `Ok(accepted)` means they agree (and `accepted` is their shared answer);
+/// `Err(Mismatch)` means they disagree. Reuses [`Mismatch`] -- the same accept/reject
+/// shape as the ML-DSA differential.
+pub fn differential_lms_verify(
+    reference: &dyn LmsReference,
+    public_key: &[u8],
+    message: &[u8],
+    signature: &[u8],
+) -> Result<bool, Mismatch> {
+    let ours = our_lms_verify(public_key, message, signature);
+    let theirs = reference.verify(public_key, message, signature);
+    if ours == theirs {
+        Ok(ours)
+    } else {
+        Err(Mismatch {
+            ours,
+            reference: theirs,
+        })
+    }
+}
