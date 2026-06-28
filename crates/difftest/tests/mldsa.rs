@@ -7,7 +7,7 @@
 
 use crypto::mldsa::MlDsa;
 use crypto::sign::{Signer, SigningKey, VerifyingKey};
-use koffer_difftest::{MlDsaSet, OqsMlDsa, differential_verify, kat};
+use koffer_difftest::{Mismatch, MlDsaReference, MlDsaSet, OqsMlDsa, differential_verify, kat};
 use ml_dsa::MlDsa65;
 use proptest::prelude::*;
 
@@ -85,4 +85,45 @@ proptest! {
         .expect("backends agree on a tampered signature");
         prop_assert!(!agreed);
     }
+}
+
+// Group 3: the negative meta-test -- the harness is not a no-op.
+/// A deliberately-wrong reference that accepts everything.
+struct AlwaysAccept;
+
+impl MlDsaReference for AlwaysAccept {
+    fn verify(
+        &self,
+        _set: MlDsaSet,
+        _public_key: &[u8],
+        _message: &[u8],
+        _signature: &[u8],
+    ) -> bool {
+        true
+    }
+}
+
+#[test]
+fn differential_catches_a_wrong_reference() {
+    // On a must-reject vector our backend rejects while `AlwaysAccept` accepts, so the
+    // differential must surface a mismatch instead of a false agreement.
+    let records = kat::parse(VERIFY_65);
+    let reject = records
+        .iter()
+        .find(|r| r.field("result").unwrap()[0] == 0x00)
+        .expect("a must-reject vector exists");
+    let result = differential_verify(
+        &AlwaysAccept,
+        MlDsaSet::MlDsa65,
+        reject.field("public_key").unwrap(),
+        reject.field("message").unwrap(),
+        reject.field("signature").unwrap(),
+    );
+    assert_eq!(
+        result,
+        Err(Mismatch {
+            ours: false,
+            reference: true
+        })
+    );
 }
