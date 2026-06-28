@@ -278,3 +278,45 @@ pub fn differential_decapsulate(
         })
     }
 }
+
+/// FFI to the vendored Cisco hash-sigs verify entry point (`build.rs` compiles it).
+unsafe extern "C" {
+    fn hss_validate_signature(
+        public_key: *const u8,
+        message: *const core::ffi::c_void,
+        message_len: usize,
+        signature: *const u8,
+        signature_len: usize,
+        info: *mut core::ffi::c_void,
+    ) -> bool;
+}
+
+/// An independent LMS/HSS verifier -- the reference side of the differential.
+///
+/// `verify` returns whether the reference accepts. A wrong-length key or signature is a
+/// rejection, not a panic, so malformed inputs compare cleanly against our backend.
+pub trait LmsReference {
+    /// Whether the reference accepts `signature` over `message` under `public_key`.
+    fn verify(&self, public_key: &[u8], message: &[u8], signature: &[u8]) -> bool;
+}
+
+/// The Cisco hash-sigs reference, via the vendored C verify path.
+pub struct HashSigs;
+
+impl LmsReference for HashSigs {
+    fn verify(&self, public_key: &[u8], message: &[u8], signature: &[u8]) -> bool {
+        // SAFETY: each slice is valid for reads of its length for the duration of the
+        // call; `hss_validate_signature` only reads them. The optional `info`
+        // out-parameter is passed as null.
+        unsafe {
+            hss_validate_signature(
+                public_key.as_ptr(),
+                message.as_ptr() as *const core::ffi::c_void,
+                message.len(),
+                signature.as_ptr(),
+                signature.len(),
+                core::ptr::null_mut(),
+            )
+        }
+    }
+}
