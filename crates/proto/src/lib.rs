@@ -14,7 +14,9 @@ pub mod codec;
 pub mod cose;
 pub mod digest;
 pub mod error;
+pub mod frame;
 pub mod manifest;
+pub mod message;
 
 #[cfg(test)]
 mod testutil;
