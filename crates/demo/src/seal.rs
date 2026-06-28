@@ -16,8 +16,43 @@ use crypto::kem::{DecapsulationKey, EncapsulationKey};
 use crypto::profile::CryptoProfile;
 use crypto::seal::{Sealed, seal, unseal};
 use proto::alg::AlgId;
+use proto::codec;
+use proto::cose::{CoseEncrypt, Recipient};
 use rand_core::CryptoRng;
 use sha2::{Sha256, Sha384};
+
+/// Seals `plaintext` to a fresh recipient keypair under `profile` and frames it as an
+/// encoded `COSE_Encrypt`. Returns the encoding and the decapsulation key that opens it.
+pub fn seal_payload(
+    profile: CryptoProfile,
+    plaintext: &[u8],
+    aad: &[u8],
+    rng: &mut dyn CryptoRng,
+) -> (Vec<u8>, DecapsulationKey) {
+    let mut keygen_entropy = [0u8; 96];
+    rng.fill_bytes(&mut keygen_entropy);
+    let (encapsulation_key, decapsulation_key) = keygen_recipient(profile, &keygen_entropy);
+
+    let mut buffer = plaintext.to_vec();
+    let sealed = seal_with_profile(profile, &encapsulation_key, aad, &mut buffer, rng);
+    buffer.extend_from_slice(sealed.tag.as_slice()); // frame ciphertext || tag
+
+    let recipient = Recipient::new(
+        AlgId::new(profile.hybrid_kem().cose_id() as i64),
+        None,
+        sealed.kem_ciphertext.as_slice(),
+    );
+    let cose = CoseEncrypt::new(
+        AlgId::new(profile.aead().cose_id() as i64),
+        sealed.nonce.as_slice(),
+        &buffer,
+        recipient,
+    );
+    (
+        codec::encode(&cose).expect("encode COSE_Encrypt"),
+        decapsulation_key,
+    )
+}
 
 // Per-scheme knowledge lives only in the three helpers below; the flow never names a scheme.
 
