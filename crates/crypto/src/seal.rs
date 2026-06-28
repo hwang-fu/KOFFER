@@ -11,7 +11,7 @@ use crate::{
     aead::{self, Aead},
     error::{AeadError, KdfError, KemError},
     kdf::Kdf,
-    kem::{Ciphertext, EncapsulationKey, Kem, SharedSecret},
+    kem::{Ciphertext, DecapsulationKey, EncapsulationKey, Kem, SharedSecret},
 };
 use zeroize::Zeroize;
 
@@ -103,4 +103,23 @@ pub fn seal<K: Kem, D: Kdf, A: Aead>(
         nonce,
         tag,
     })
+}
+
+/// Unseals `buffer` (ciphertext -> plaintext in place) using `recipient` and the sealed components.
+///
+/// Decapsulates the shared secret, re-derives the AEAD key, and AEAD-decrypts-and-verifies.
+/// Fails if the ciphertext, nonce, or KEM encapsulation was tampered, or the key is wrong.
+pub fn open<K: Kem, D: Kdf, A: Aead>(
+    kem: &K,
+    kdf: &D,
+    aead: &A,
+    recipient: &DecapsulationKey,
+    sealed: &Sealed,
+    aad: &[u8],
+    buffer: &mut [u8],
+) -> Result<(), SealError> {
+    let shared_secret = kem.decapsulate(recipient, &sealed.kem_ciphertext)?;
+    let (key, _derived_nonce) = derive_key_nonce(kdf, &shared_secret)?;
+    aead.open(&key, &sealed.nonce, aad, buffer, &sealed.tag)?;
+    Ok(())
 }
