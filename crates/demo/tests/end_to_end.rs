@@ -29,8 +29,8 @@ impl rand_core::TryCryptoRng for TestRng {}
 
 #[test]
 fn full_flow_runs_in_both_profiles() {
-    assert!(run::run(CryptoProfile::Showcase, &mut TestRng(1)));
-    assert!(run::run(CryptoProfile::Cnsa20, &mut TestRng(1)));
+    assert!(run::run(CryptoProfile::Showcase, &mut TestRng(1)).ok());
+    assert!(run::run(CryptoProfile::Cnsa20, &mut TestRng(1)).ok());
 }
 
 #[test]
