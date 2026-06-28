@@ -7,7 +7,11 @@
 //! bytes; the `COSE_Encrypt` framing is applied by the consumer, so this crate stays
 //! independent of `koffer-proto`.
 
-use crate::{aead, kem::Ciphertext};
+use crate::{
+    aead,
+    error::{AeadError, KdfError, KemError},
+    kem::Ciphertext,
+};
 
 /// The raw components of a sealed payload (the ciphertext stays in the caller's buffer).
 ///
@@ -21,4 +25,35 @@ pub struct Sealed {
     pub nonce: aead::Nonce,
     /// The AEAD authentication tag.
     pub tag: aead::Tag,
+}
+
+/// An error from sealing or opening.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SealError {
+    /// The KEM step failed (malformed key or ciphertext).
+    Kem(KemError),
+    /// The KDF step failed.
+    Kdf(KdfError),
+    /// The AEAD step failed; `Aead(AeadError::OpenFailed)` means tampering or the wrong key.
+    Aead(AeadError),
+    /// An internal invariant was violated (should not happen).
+    Internal,
+}
+
+impl From<KemError> for SealError {
+    fn from(e: KemError) -> Self {
+        SealError::Kem(e)
+    }
+}
+
+impl From<KdfError> for SealError {
+    fn from(e: KdfError) -> Self {
+        SealError::Kdf(e)
+    }
+}
+
+impl From<AeadError> for SealError {
+    fn from(e: AeadError) -> Self {
+        SealError::Aead(e)
+    }
 }
