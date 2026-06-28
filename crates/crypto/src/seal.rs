@@ -128,7 +128,7 @@ pub fn unseal<K: Kem, D: Kdf, A: Aead>(
 mod tests {
     use super::*;
     use crate::aead::Aes256Gcm;
-    use crate::hybrid::{X25519MlKem1024, X25519MlKem768};
+    use crate::hybrid::{X25519MlKem768, X25519MlKem1024};
     use crate::kdf::Hkdf;
     use crate::mlkem::MlKem;
     use core::convert::Infallible;
@@ -177,7 +177,10 @@ mod tests {
         assert_ne!(buffer, plaintext, "buffer should be encrypted in place");
 
         unseal(kem, kdf, aead, dk, &sealed, aad, &mut buffer).expect("unseal");
-        assert_eq!(buffer, plaintext, "unseal should recover the exact plaintext");
+        assert_eq!(
+            buffer, plaintext,
+            "unseal should recover the exact plaintext"
+        );
     }
 
     #[test]
