@@ -6,3 +6,5 @@
 //!
 //! This is the first crate that depends on both foundation crates. It is host-only
 //! and is never part of the firmware build.
+
+pub mod sign;
