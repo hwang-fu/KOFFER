@@ -123,3 +123,88 @@ pub fn unseal<K: Kem, D: Kdf, A: Aead>(
     aead.open(&key, &sealed.nonce, aad, buffer, &sealed.tag)?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::aead::Aes256Gcm;
+    use crate::hybrid::{X25519MlKem1024, X25519MlKem768};
+    use crate::kdf::Hkdf;
+    use crate::mlkem::MlKem;
+    use core::convert::Infallible;
+    use rand_core::{TryCryptoRng, TryRng};
+    use sha2::{Sha256, Sha384};
+
+    /// Fixed entropy for keygen (>= 64 bytes for ML-KEM, >= 96 for hybrid).
+    const ENTROPY: [u8; 96] = [0x07; 96];
+
+    /// Deterministic counter RNG (round-trips do not depend on the RNG value).
+    struct TestRng(u64);
+
+    impl TryRng for TestRng {
+        type Error = Infallible;
+        fn try_next_u32(&mut self) -> Result<u32, Infallible> {
+            Ok(self.try_next_u64()? as u32)
+        }
+        fn try_next_u64(&mut self) -> Result<u64, Infallible> {
+            self.0 = self.0.wrapping_add(1);
+            Ok(self.0)
+        }
+        fn try_fill_bytes(&mut self, dst: &mut [u8]) -> Result<(), Infallible> {
+            for chunk in dst.chunks_mut(8) {
+                let value = self.try_next_u64()?.to_le_bytes();
+                chunk.copy_from_slice(&value[..chunk.len()]);
+            }
+            Ok(())
+        }
+    }
+    impl TryCryptoRng for TestRng {}
+
+    /// `seal -> unseal` recovers the exact plaintext, for any KEM/KDF/AEAD combo.
+    fn roundtrip<K: Kem, D: Kdf, A: Aead>(
+        kem: &K,
+        kdf: &D,
+        aead: &A,
+        ek: &EncapsulationKey,
+        dk: &DecapsulationKey,
+    ) {
+        let plaintext = [0xABu8; 40];
+        let aad = b"koffer seal roundtrip";
+        let mut rng = TestRng(0);
+        let mut buffer = plaintext;
+
+        let sealed = seal(kem, kdf, aead, ek, aad, &mut buffer, &mut rng).expect("seal");
+        assert_ne!(buffer, plaintext, "buffer should be encrypted in place");
+
+        unseal(kem, kdf, aead, dk, &sealed, aad, &mut buffer).expect("unseal");
+        assert_eq!(buffer, plaintext, "unseal should recover the exact plaintext");
+    }
+
+    #[test]
+    fn roundtrip_showcase_mlkem() {
+        let kem = MlKem::<ml_kem::MlKem768>::new();
+        let (ek, dk) = kem.keygen(&ENTROPY).unwrap();
+        roundtrip(&kem, &Hkdf::<Sha256>::new(), &Aes256Gcm, &ek, &dk);
+    }
+
+    #[test]
+    fn roundtrip_showcase_hybrid() {
+        let kem = X25519MlKem768;
+        let (ek, dk) = kem.keygen(&ENTROPY).unwrap();
+        roundtrip(&kem, &Hkdf::<Sha256>::new(), &Aes256Gcm, &ek, &dk);
+    }
+
+    #[test]
+    fn roundtrip_cnsa20_mlkem() {
+        let kem = MlKem::<ml_kem::MlKem1024>::new();
+        let (ek, dk) = kem.keygen(&ENTROPY).unwrap();
+        roundtrip(&kem, &Hkdf::<Sha384>::new(), &Aes256Gcm, &ek, &dk);
+    }
+
+    #[test]
+    fn roundtrip_cnsa20_hybrid() {
+        let kem = X25519MlKem1024;
+        let (ek, dk) = kem.keygen(&ENTROPY).unwrap();
+        roundtrip(&kem, &Hkdf::<Sha384>::new(), &Aes256Gcm, &ek, &dk);
+    }
+}
