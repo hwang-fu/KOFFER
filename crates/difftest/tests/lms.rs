@@ -9,7 +9,7 @@
 use crypto::lms::{Lms, showcase_params};
 use crypto::sign::{SigningKey, StatefulSigner, VerifyingKey};
 use hbs_lms::Sha256_256;
-use koffer_difftest::{HashSigs, differential_lms_verify, kat};
+use koffer_difftest::{HashSigs, LmsReference, Mismatch, differential_lms_verify, kat};
 use proptest::prelude::*;
 
 const TC1: &str = include_str!("../../../kat/lms/rfc8554-tc1.kat");
@@ -97,4 +97,27 @@ proptest! {
         .expect("backends agree on a tampered message");
         prop_assert!(!agreed);
     }
+}
+
+// A deliberately-wrong reference that accepts everything.
+struct AlwaysAccept;
+
+impl LmsReference for AlwaysAccept {
+    fn verify(&self, _public_key: &[u8], _message: &[u8], _signature: &[u8]) -> bool {
+        true
+    }
+}
+
+#[test]
+fn differential_catches_a_wrong_reference() {
+    // On a tampered message our backend rejects while `AlwaysAccept` accepts, so the
+    // differential must surface a mismatch instead of a false agreement.
+    let records = kat::parse(TC1);
+    let r = records.first().expect("a vector");
+    let public_key = r.field("public_key").unwrap();
+    let signature = r.field("signature").unwrap();
+    let mut tampered = r.field("message").unwrap().to_vec();
+    tampered[0] ^= 0x01;
+    let result = differential_lms_verify(&AlwaysAccept, public_key, &tampered, signature);
+    assert_eq!(result, Err(Mismatch { ours: false, reference: true }));
 }
