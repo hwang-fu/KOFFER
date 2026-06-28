@@ -135,3 +135,12 @@ fn our_verify_with<P: ml_dsa::MlDsaParams>(
         .verify(&key, message, &sig)
         .is_ok()
 }
+
+/// The two backends disagreed on one input -- the differential found a defect.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Mismatch {
+    /// What our backend answered (true = accept).
+    pub ours: bool,
+    /// What the reference answered (true = accept).
+    pub reference: bool,
+}
