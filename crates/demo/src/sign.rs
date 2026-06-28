@@ -28,8 +28,8 @@ pub fn sign_manifest(
     let manifest_bytes = codec::encode(manifest).expect("encode manifest");
 
     let (signer, signing_key, verifying_key) = make_signer(alg, entropy);
-    let to_be_signed =
-        codec::encode(&SigStructure::new(alg_id, &[], &manifest_bytes)).expect("encode Sig_structure");
+    let to_be_signed = codec::encode(&SigStructure::new(alg_id, &[], &manifest_bytes))
+        .expect("encode Sig_structure");
     let signature = signer
         .sign(&signing_key, &to_be_signed)
         .expect("sign Sig_structure");
@@ -40,7 +40,10 @@ pub fn sign_manifest(
         Payload::Attached(&manifest_bytes),
         signature.as_slice(),
     );
-    (codec::encode(&cose).expect("encode COSE_Sign1"), verifying_key)
+    (
+        codec::encode(&cose).expect("encode COSE_Sign1"),
+        verifying_key,
+    )
 }
 
 /// Verifies an encoded `COSE_Sign1` against `verifying_key`. The verifier backend is
@@ -55,7 +58,8 @@ pub fn verify_manifest(cose_bytes: &[u8], verifying_key: &VerifyingKey) -> bool 
     let Ok(signature) = Signature::try_from(cose.signature()) else {
         return false;
     };
-    let Ok(to_be_signed) = codec::encode(&SigStructure::new(cose.alg(), &[], manifest_bytes)) else {
+    let Ok(to_be_signed) = codec::encode(&SigStructure::new(cose.alg(), &[], manifest_bytes))
+    else {
         return false;
     };
     verifier_from_codepoint(cose.alg())
