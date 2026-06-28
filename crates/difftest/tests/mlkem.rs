@@ -6,7 +6,7 @@
 //! catches a disagreeing reference.
 
 use koffer_difftest::{
-    KemMismatch, MlKemReference, MlKemSet, OqsMlKem, differential_decapsulate, kat,
+    KemMismatch, MlKemNative, MlKemReference, MlKemSet, OqsMlKem, differential_decapsulate, kat,
 };
 use proptest::prelude::*;
 
@@ -17,8 +17,19 @@ const KEM_1024: &str = include_str!("../../../kat/mlkem/wycheproof-1024.kat");
 const SEED: [u8; 64] = [0x42u8; 64];
 const MLKEM768_CIPHERTEXT_LEN: usize = 1088;
 
+// The independent references the ML-KEM differential runs against: liboqs (widely deployed)
+// and mlkem-native (formally verified). Every vector is checked against both.
+fn references() -> [(&'static str, &'static dyn MlKemReference); 2] {
+    [("oqs", &OqsMlKem), ("mlkem-native", &MlKemNative)]
+}
+
 // Group 1: the Wycheproof decapsulation vectors, three-way (ours == oqs == vector).
-fn decapsulate_kat_differential(set: MlKemSet, vectors: &str) {
+fn decapsulate_kat_differential(
+    name: &str,
+    reference: &dyn MlKemReference,
+    set: MlKemSet,
+    vectors: &str,
+) {
     let records = kat::parse(vectors);
     assert!(!records.is_empty());
     for r in &records {
@@ -26,20 +37,22 @@ fn decapsulate_kat_differential(set: MlKemSet, vectors: &str) {
         let seed = r.field("seed").unwrap();
         let ciphertext = r.field("ciphertext").unwrap();
         let expected = r.field("shared_secret").unwrap();
-        let agreed = differential_decapsulate(&OqsMlKem, set, seed, ciphertext)
-            .unwrap_or_else(|m| panic!("{set:?} tcId {tc_id}: backends disagree: {m:?}"));
+        let agreed = differential_decapsulate(reference, set, seed, ciphertext)
+            .unwrap_or_else(|m| panic!("{name} {set:?} tcId {tc_id}: backends disagree: {m:?}"));
         assert_eq!(
             agreed.as_deref(),
             Some(expected),
-            "{set:?} tcId {tc_id}: agreed secret differs from the vector"
+            "{name} {set:?} tcId {tc_id}: agreed secret differs from the vector"
         );
     }
 }
 
 #[test]
 fn wycheproof_decapsulate_differential() {
-    decapsulate_kat_differential(MlKemSet::MlKem768, KEM_768);
-    decapsulate_kat_differential(MlKemSet::MlKem1024, KEM_1024);
+    for (name, reference) in references() {
+        decapsulate_kat_differential(name, reference, MlKemSet::MlKem768, KEM_768);
+        decapsulate_kat_differential(name, reference, MlKemSet::MlKem1024, KEM_1024);
+    }
 }
 
 proptest! {
@@ -52,9 +65,13 @@ proptest! {
     fn random_ciphertext_same_implicit_rejection(
         ciphertext in prop::collection::vec(any::<u8>(), MLKEM768_CIPHERTEXT_LEN)
     ) {
-        let agreed = differential_decapsulate(&OqsMlKem, MlKemSet::MlKem768, &SEED, &ciphertext)
-            .expect("backends agree on a random ciphertext");
-        prop_assert!(agreed.is_some());
+        for (name, reference) in references() {
+            let agreed = differential_decapsulate(reference, MlKemSet::MlKem768, &SEED, &ciphertext);
+            prop_assert!(
+                matches!(agreed, Ok(Some(_))),
+                "{name}: expected agreement, got {agreed:?}"
+            );
+        }
     }
 }
 
