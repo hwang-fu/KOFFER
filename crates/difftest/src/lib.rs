@@ -66,3 +66,12 @@ pub mod kat {
             .collect()
     }
 }
+
+/// The ML-DSA parameter set under test.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MlDsaSet {
+    /// ML-DSA-65 (showcase profile).
+    MlDsa65,
+    /// ML-DSA-87 (CNSA 2.0 profile).
+    MlDsa87,
+}
