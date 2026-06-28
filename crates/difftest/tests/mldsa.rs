@@ -14,8 +14,11 @@ use proptest::prelude::*;
 const VERIFY_65: &str = include_str!("../../../kat/mldsa/wycheproof-verify-65.kat");
 const VERIFY_87: &str = include_str!("../../../kat/mldsa/wycheproof-verify-87.kat");
 
-// (parameter set, tcId) cases where liboqs is known to diverge from our backend and
-// FIPS 204. Each entry is a documented reference leniency, not a bug in our backend.
+// (parameter set, tcId) cases where liboqs MAY diverge from our backend and FIPS 204 --
+// each a documented liboqs leniency, not a bug in our backend. These are *permitted*, not
+// required: liboqs's optimized verify is lenient on these norm-boundary cases on some
+// architectures (x86_64) but strict on others (aarch64), so a documented vector that does
+// not diverge on a given target is fine. On every other vector the two must still agree.
 const KNOWN_OQS_DIVERGENCES: &[(MlDsaSet, u32)] = &[
     // liboqs 0.13.0 accepts a signature whose `z` vector violates the FIPS 204
     // infinity-norm bound; our backend and the Wycheproof vector both reject it.
@@ -27,11 +30,10 @@ const KNOWN_OQS_DIVERGENCES: &[(MlDsaSet, u32)] = &[
 ];
 
 // Group 1: the Wycheproof verify vectors. Our backend and oqs must agree and match the
-// vector, except on the documented liboqs divergences above.
+// vector, except on the documented (permitted) liboqs divergences above.
 fn verify_kat_differential(set: MlDsaSet, vectors: &str) {
     let records = kat::parse(vectors);
     assert!(!records.is_empty());
-    let mut diverged = Vec::new();
     let mut unexpected = Vec::new();
     for r in &records {
         let tc_id = r.tc_id().expect("each vector has a tcId");
@@ -45,7 +47,8 @@ fn verify_kat_differential(set: MlDsaSet, vectors: &str) {
                 "{set:?} tcId {tc_id}: agreed answer differs from the vector"
             ),
             Err(mismatch) => {
-                diverged.push(tc_id);
+                // Tolerated only if it is a documented liboqs leniency and our backend
+                // still matches the vector; anything else is a finding.
                 let documented = KNOWN_OQS_DIVERGENCES.contains(&(set, tc_id));
                 let ours_matches_vector = mismatch.ours == expected;
                 if !(documented && ours_matches_vector) {
@@ -58,16 +61,6 @@ fn verify_kat_differential(set: MlDsaSet, vectors: &str) {
         unexpected.is_empty(),
         "{set:?}: unexpected differential divergences (tcId, mismatch): {unexpected:?}"
     );
-    // Each documented divergence must still occur; a missing one means liboqs changed
-    // and the entry is stale.
-    for &(divergent_set, tc_id) in KNOWN_OQS_DIVERGENCES {
-        if divergent_set == set {
-            assert!(
-                diverged.contains(&tc_id),
-                "{set:?} tcId {tc_id}: documented divergence no longer occurs; remove it"
-            );
-        }
-    }
 }
 
 #[test]
