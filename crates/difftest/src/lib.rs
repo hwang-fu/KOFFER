@@ -10,6 +10,8 @@
 //! and its (potentially C-backed) reference libraries are excluded by
 //! construction.
 
+use crypto::sign::{Signature, Verifier, VerifyingKey};
+
 /// Parser for the project's `name = hex` known-answer-test files.
 ///
 /// The crypto crate has its own parser, but it is private to that crate, so the
@@ -106,4 +108,30 @@ impl MlDsaReference for OqsMlDsa {
         };
         scheme.verify(message, sig, pk).is_ok()
     }
+}
+
+/// Verifies with our `koffer-crypto` ML-DSA backend -- the implementation under test.
+///
+/// A wrong-length key or signature is a rejection, mirroring the reference.
+pub fn our_verify(set: MlDsaSet, public_key: &[u8], message: &[u8], signature: &[u8]) -> bool {
+    match set {
+        MlDsaSet::MlDsa65 => our_verify_with::<ml_dsa::MlDsa65>(public_key, message, signature),
+        MlDsaSet::MlDsa87 => our_verify_with::<ml_dsa::MlDsa87>(public_key, message, signature),
+    }
+}
+
+fn our_verify_with<P: ml_dsa::MlDsaParams>(
+    public_key: &[u8],
+    message: &[u8],
+    signature: &[u8],
+) -> bool {
+    let (Ok(key), Ok(sig)) = (
+        VerifyingKey::try_from(public_key),
+        Signature::try_from(signature),
+    ) else {
+        return false;
+    };
+    crypto::mldsa::MlDsa::<P>::new()
+        .verify(&key, message, &sig)
+        .is_ok()
 }
