@@ -279,7 +279,7 @@ pub fn differential_decapsulate(
     }
 }
 
-/// FFI to the vendored Cisco hash-sigs verify entry point (`build.rs` compiles it).
+// FFI to the vendored Cisco hash-sigs verify entry point (`build.rs` compiles it).
 unsafe extern "C" {
     fn hss_validate_signature(
         public_key: *const u8,
