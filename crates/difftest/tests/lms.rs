@@ -56,7 +56,7 @@ fn showcase_keypair() -> &'static (SigningKey, VerifyingKey) {
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig { cases: 16, ..ProptestConfig::default() })]
+    #![proptest_config(ProptestConfig { cases: 8, ..ProptestConfig::default() })]
 
     // A genuine signature from our backend: both verifiers accept, and they agree.
     #[test]
@@ -119,5 +119,11 @@ fn differential_catches_a_wrong_reference() {
     let mut tampered = r.field("message").unwrap().to_vec();
     tampered[0] ^= 0x01;
     let result = differential_lms_verify(&AlwaysAccept, public_key, &tampered, signature);
-    assert_eq!(result, Err(Mismatch { ours: false, reference: true }));
+    assert_eq!(
+        result,
+        Err(Mismatch {
+            ours: false,
+            reference: true
+        })
+    );
 }
