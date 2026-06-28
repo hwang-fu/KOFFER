@@ -144,3 +144,26 @@ pub struct Mismatch {
     /// What the reference answered (true = accept).
     pub reference: bool,
 }
+
+/// Runs our backend and `reference` on the same verify input and compares them.
+///
+/// `Ok(accepted)` means they agree (and `accepted` is their shared answer);
+/// `Err(Mismatch)` means they disagree, which is a finding.
+pub fn differential_verify(
+    reference: &dyn MlDsaReference,
+    set: MlDsaSet,
+    public_key: &[u8],
+    message: &[u8],
+    signature: &[u8],
+) -> Result<bool, Mismatch> {
+    let ours = our_verify(set, public_key, message, signature);
+    let theirs = reference.verify(set, public_key, message, signature);
+    if ours == theirs {
+        Ok(ours)
+    } else {
+        Err(Mismatch {
+            ours,
+            reference: theirs,
+        })
+    }
+}
