@@ -7,3 +7,4 @@ repository.workspace = true
 
 [dependencies]
 crypto = { version = "0.1.0", path = "../crypto", package = "koffer-crypto", features = ["std"] }
+oqs = { version = "0.11.0", default-features = false, features = ["std", "ml_dsa"] }
