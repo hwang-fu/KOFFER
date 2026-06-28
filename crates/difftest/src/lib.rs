@@ -75,3 +75,13 @@ pub enum MlDsaSet {
     /// ML-DSA-87 (CNSA 2.0 profile).
     MlDsa87,
 }
+
+/// An independent ML-DSA verifier -- the reference side of the differential.
+///
+/// `verify` returns whether the reference accepts. A wrong-length key or
+/// signature is a rejection, not a panic, so malformed-input vectors compare
+/// cleanly against our backend.
+pub trait MlDsaReference {
+    /// Whether the reference accepts `signature` over `message` under `public_key`.
+    fn verify(&self, set: MlDsaSet, public_key: &[u8], message: &[u8], signature: &[u8]) -> bool;
+}
