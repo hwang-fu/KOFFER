@@ -165,6 +165,13 @@ mod tests {
     }
 
     #[test]
+    fn aead_alg_codepoints_round_trip() {
+        for alg in [AeadAlg::Aes256Gcm, AeadAlg::ChaCha20Poly1305] {
+            assert_eq!(AeadAlg::from_cose_id(alg.cose_id()), Some(alg));
+        }
+    }
+
+    #[test]
     fn unknown_codepoint_is_none() {
         assert_eq!(SigAlg::from_cose_id(0), None);
         assert_eq!(KemAlg::from_cose_id(0), None);
