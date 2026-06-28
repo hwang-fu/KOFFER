@@ -10,6 +10,7 @@
 //! and its (potentially C-backed) reference libraries are excluded by
 //! construction.
 
+use crypto::kem::{Ciphertext, Kem};
 use crypto::sign::{Signature, Verifier, VerifyingKey};
 
 /// Parser for the project's `name = hex` known-answer-test files.
@@ -220,5 +221,29 @@ impl MlKemReference for OqsMlKem {
         let (_encapsulation_key, secret_key) = kem.keypair_derand(seed).ok()?;
         let ciphertext = kem.ciphertext_from_bytes(ciphertext)?;
         Some(kem.decapsulate(&secret_key, ciphertext).ok()?.into_vec())
+    }
+}
+
+/// Decapsulates with our `koffer-crypto` ML-KEM backend -- the implementation under test.
+///
+/// Derives the keypair from `seed`, then recovers the shared secret for `ciphertext`.
+/// A wrong-length seed or ciphertext is `None`, mirroring the reference.
+pub fn our_decapsulate(set: MlKemSet, seed: &[u8], ciphertext: &[u8]) -> Option<Vec<u8>> {
+    let ct = Ciphertext::try_from(ciphertext).ok()?;
+    // `ml-kem`'s parameter bound is private, so a generic helper cannot name it; expand
+    // the concrete keygen + decapsulate per parameter set.
+    macro_rules! decapsulate_with {
+        ($param:ty) => {{
+            let backend = crypto::mlkem::MlKem::<$param>::new();
+            let (_encapsulation_key, decapsulation_key) = backend.keygen(seed).ok()?;
+            backend
+                .decapsulate(&decapsulation_key, &ct)
+                .ok()
+                .map(|secret| secret.as_slice().to_vec())
+        }};
+    }
+    match set {
+        MlKemSet::MlKem768 => decapsulate_with!(ml_kem::MlKem768),
+        MlKemSet::MlKem1024 => decapsulate_with!(ml_kem::MlKem1024),
     }
 }
