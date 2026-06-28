@@ -20,6 +20,10 @@ const KNOWN_OQS_DIVERGENCES: &[(MlDsaSet, u32)] = &[
     // liboqs 0.13.0 accepts a signature whose `z` vector violates the FIPS 204
     // infinity-norm bound; our backend and the Wycheproof vector both reject it.
     (MlDsaSet::MlDsa65, 84),
+    // The same leniency at the exact bound: a `z` coefficient equal to gamma1 - tau*eta,
+    // which FIPS 204's strict bound rejects (as do we) but liboqs accepts. A clearly
+    // out-of-bound signature (tcId 77) is still rejected by both.
+    (MlDsaSet::MlDsa87, 151),
 ];
 
 // Group 1: the Wycheproof verify vectors. Our backend and oqs must agree and match the
