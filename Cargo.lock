@@ -525,6 +525,7 @@ dependencies = [
 name = "koffer-difftest"
 version = "0.1.0"
 dependencies = [
+ "cc",
  "koffer-crypto",
  "ml-dsa",
  "ml-kem",
