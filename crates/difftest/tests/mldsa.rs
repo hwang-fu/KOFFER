@@ -14,21 +14,55 @@ use proptest::prelude::*;
 const VERIFY_65: &str = include_str!("../../../kat/mldsa/wycheproof-verify-65.kat");
 const VERIFY_87: &str = include_str!("../../../kat/mldsa/wycheproof-verify-87.kat");
 
-// Group 1: the Wycheproof verify vectors, three-way (our backend == oqs == vector).
+// (parameter set, tcId) cases where liboqs is known to diverge from our backend and
+// FIPS 204. Each entry is a documented reference leniency, not a bug in our backend.
+const KNOWN_OQS_DIVERGENCES: &[(MlDsaSet, u32)] = &[
+    // liboqs 0.13.0 accepts a signature whose `z` vector violates the FIPS 204
+    // infinity-norm bound; our backend and the Wycheproof vector both reject it.
+    (MlDsaSet::MlDsa65, 84),
+];
+
+// Group 1: the Wycheproof verify vectors. Our backend and oqs must agree and match the
+// vector, except on the documented liboqs divergences above.
 fn verify_kat_differential(set: MlDsaSet, vectors: &str) {
     let records = kat::parse(vectors);
     assert!(!records.is_empty());
-    for (i, r) in records.iter().enumerate() {
+    let mut diverged = Vec::new();
+    let mut unexpected = Vec::new();
+    for r in &records {
+        let tc_id = r.tc_id().expect("each vector has a tcId");
         let public_key = r.field("public_key").unwrap();
         let message = r.field("message").unwrap();
         let signature = r.field("signature").unwrap();
         let expected = r.field("result").unwrap()[0] == 0x01;
-        let agreed = differential_verify(&OqsMlDsa, set, public_key, message, signature)
-            .unwrap_or_else(|m| panic!("{set:?} record {i}: backends disagree: {m:?}"));
-        assert_eq!(
-            agreed, expected,
-            "{set:?} record {i}: differs from the vector"
-        );
+        match differential_verify(&OqsMlDsa, set, public_key, message, signature) {
+            Ok(agreed) => assert_eq!(
+                agreed, expected,
+                "{set:?} tcId {tc_id}: agreed answer differs from the vector"
+            ),
+            Err(mismatch) => {
+                diverged.push(tc_id);
+                let documented = KNOWN_OQS_DIVERGENCES.contains(&(set, tc_id));
+                let ours_matches_vector = mismatch.ours == expected;
+                if !(documented && ours_matches_vector) {
+                    unexpected.push((tc_id, mismatch));
+                }
+            }
+        }
+    }
+    assert!(
+        unexpected.is_empty(),
+        "{set:?}: unexpected differential divergences (tcId, mismatch): {unexpected:?}"
+    );
+    // Each documented divergence must still occur; a missing one means liboqs changed
+    // and the entry is stale.
+    for &(divergent_set, tc_id) in KNOWN_OQS_DIVERGENCES {
+        if divergent_set == set {
+            assert!(
+                diverged.contains(&tc_id),
+                "{set:?} tcId {tc_id}: documented divergence no longer occurs; remove it"
+            );
+        }
     }
 }
 
