@@ -207,4 +207,69 @@ mod tests {
         let (ek, dk) = kem.keygen(&ENTROPY).unwrap();
         roundtrip(&kem, &Hkdf::<Sha384>::new(), &Aes256Gcm, &ek, &dk);
     }
+
+    #[test]
+    fn tampering_makes_unseal_fail() {
+        let kem = X25519MlKem768;
+        let kdf = Hkdf::<Sha256>::new();
+        let aead = Aes256Gcm;
+        let (ek, dk) = kem.keygen(&ENTROPY).unwrap();
+
+        let plaintext = [0xABu8; 32];
+        let aad = b"ctx";
+        let mut rng = TestRng(0);
+        let mut ciphertext = plaintext;
+        let sealed = seal(&kem, &kdf, &aead, &ek, aad, &mut ciphertext, &mut rng).unwrap();
+
+        // 1. AEAD ciphertext tampered.
+        {
+            let mut buf = ciphertext;
+            buf[0] ^= 1;
+            assert!(unseal(&kem, &kdf, &aead, &dk, &sealed, aad, &mut buf).is_err());
+        }
+        // 2. Nonce tampered.
+        {
+            let mut buf = ciphertext;
+            let mut s = sealed.clone();
+            let mut n = s.nonce.as_slice().to_vec();
+            n[0] ^= 1;
+            s.nonce = aead::Nonce::try_from(n.as_slice()).unwrap();
+            assert!(unseal(&kem, &kdf, &aead, &dk, &s, aad, &mut buf).is_err());
+        }
+        // 3. KEM ciphertext tampered.
+        {
+            let mut buf = ciphertext;
+            let mut s = sealed.clone();
+            let mut c = s.kem_ciphertext.as_slice().to_vec();
+            c[0] ^= 1;
+            s.kem_ciphertext = Ciphertext::try_from(c.as_slice()).unwrap();
+            assert!(unseal(&kem, &kdf, &aead, &dk, &s, aad, &mut buf).is_err());
+        }
+        // Baseline: the untouched ciphertext recovers the plaintext.
+        {
+            let mut buf = ciphertext;
+            unseal(&kem, &kdf, &aead, &dk, &sealed, aad, &mut buf).unwrap();
+            assert_eq!(buf, plaintext);
+        }
+    }
+
+    #[test]
+    fn wrong_key_makes_unseal_fail() {
+        /// A different keypair's entropy.
+        const ENTROPY_OTHER: [u8; 96] = [0x5A; 96];
+
+        let kem = MlKem::<ml_kem::MlKem768>::new();
+        let kdf = Hkdf::<Sha256>::new();
+        let aead = Aes256Gcm;
+        let (ek, _dk) = kem.keygen(&ENTROPY).unwrap();
+        let (_ek_other, wrong_dk) = kem.keygen(&ENTROPY_OTHER).unwrap();
+
+        let plaintext = [0xABu8; 32];
+        let aad = b"ctx";
+        let mut rng = TestRng(0);
+        let mut buf = plaintext;
+        let sealed = seal(&kem, &kdf, &aead, &ek, aad, &mut buf, &mut rng).unwrap();
+
+        assert!(unseal(&kem, &kdf, &aead, &wrong_dk, &sealed, aad, &mut buf).is_err());
+    }
 }
