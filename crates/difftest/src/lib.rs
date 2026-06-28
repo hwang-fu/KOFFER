@@ -320,3 +320,19 @@ impl LmsReference for HashSigs {
         }
     }
 }
+
+/// Verifies with our `koffer-crypto` LMS backend -- the implementation under test.
+///
+/// Showcase profile (2-level HSS, SHA-256). A wrong-length key or signature is a
+/// rejection, mirroring the reference.
+pub fn our_lms_verify(public_key: &[u8], message: &[u8], signature: &[u8]) -> bool {
+    let (Ok(key), Ok(sig)) = (
+        VerifyingKey::try_from(public_key),
+        Signature::try_from(signature),
+    ) else {
+        return false;
+    };
+    crypto::lms::Lms::<hbs_lms::Sha256_256>::new()
+        .verify(&key, message, &sig)
+        .is_ok()
+}
