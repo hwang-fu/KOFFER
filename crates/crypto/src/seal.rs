@@ -109,7 +109,7 @@ pub fn seal<K: Kem, D: Kdf, A: Aead>(
 ///
 /// Decapsulates the shared secret, re-derives the AEAD key, and AEAD-decrypts-and-verifies.
 /// Fails if the ciphertext, nonce, or KEM encapsulation was tampered, or the key is wrong.
-pub fn open<K: Kem, D: Kdf, A: Aead>(
+pub fn unseal<K: Kem, D: Kdf, A: Aead>(
     kem: &K,
     kdf: &D,
     aead: &A,
