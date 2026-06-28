@@ -8,10 +8,10 @@
 //! independent of `koffer-proto`.
 
 use crate::{
-    aead,
+    aead::{self, Aead},
     error::{AeadError, KdfError, KemError},
     kdf::Kdf,
-    kem::{Ciphertext, SharedSecret},
+    kem::{Ciphertext, EncapsulationKey, Kem, SharedSecret},
 };
 use zeroize::Zeroize;
 
@@ -79,4 +79,28 @@ fn derive_key_nonce<D: Kdf>(
     let nonce = aead::Nonce::try_from(&okm[aead::KEY_LEN..]).map_err(|_| SealError::Internal)?;
     okm.zeroize();
     Ok((key, nonce))
+}
+
+/// Seals `buffer` (plaintext -> ciphertext in place) to `recipient`, returning the components.
+///
+/// Encapsulates a fresh shared secret to `recipient`, derives the AEAD key and nonce from it,
+/// and AEAD-encrypts `buffer` with `aad`. Works with any KEM (plain ML-KEM or hybrid), KDF,
+/// and AEAD.
+pub fn seal<K: Kem, D: Kdf, A: Aead>(
+    kem: &K,
+    kdf: &D,
+    aead: &A,
+    recipient: &EncapsulationKey,
+    aad: &[u8],
+    buffer: &mut [u8],
+    rng: &mut dyn rand_core::CryptoRng,
+) -> Result<Sealed, SealError> {
+    let (kem_ciphertext, shared_secret) = kem.encapsulate(recipient, rng)?;
+    let (key, nonce) = derive_key_nonce(kdf, &shared_secret)?;
+    let tag = aead.seal(&key, &nonce, aad, buffer)?;
+    Ok(Sealed {
+        kem_ciphertext,
+        nonce,
+        tag,
+    })
 }
