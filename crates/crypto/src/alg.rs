@@ -71,6 +71,10 @@ const COSE_ML_KEM_1024: i32 = -65540;
 const COSE_X25519_ML_KEM_768: i32 = -65541;
 const COSE_X25519_ML_KEM_1024: i32 = -65542;
 
+// AEAD codepoints are IANA-registered (RFC 9053), unlike the project-local PQC values above.
+const COSE_AES_256_GCM: i32 = 3;
+const COSE_CHACHA20_POLY1305: i32 = 24;
+
 impl SigAlg {
     /// The COSE algorithm codepoint that identifies this algorithm on the wire.
     pub fn cose_id(self) -> i32 {
@@ -110,6 +114,25 @@ impl KemAlg {
             COSE_ML_KEM_1024 => Some(KemAlg::MlKem1024),
             COSE_X25519_ML_KEM_768 => Some(KemAlg::X25519MlKem768),
             COSE_X25519_ML_KEM_1024 => Some(KemAlg::X25519MlKem1024),
+            _ => None,
+        }
+    }
+}
+
+impl AeadAlg {
+    /// The COSE algorithm codepoint that identifies this AEAD on the wire.
+    pub fn cose_id(self) -> i32 {
+        match self {
+            AeadAlg::Aes256Gcm => COSE_AES_256_GCM,
+            AeadAlg::ChaCha20Poly1305 => COSE_CHACHA20_POLY1305,
+        }
+    }
+
+    /// The AEAD for a COSE codepoint, or `None` if it is not recognized.
+    pub fn from_cose_id(id: i32) -> Option<Self> {
+        match id {
+            COSE_AES_256_GCM => Some(AeadAlg::Aes256Gcm),
+            COSE_CHACHA20_POLY1305 => Some(AeadAlg::ChaCha20Poly1305),
             _ => None,
         }
     }
