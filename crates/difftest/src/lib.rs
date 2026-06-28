@@ -17,12 +17,19 @@ use crypto::sign::{Signature, Verifier, VerifyingKey};
 /// The crypto crate has its own parser, but it is private to that crate, so the
 /// harness carries a small independent copy.
 pub mod kat {
-    /// One record: named, hex-decoded fields in file order.
+    /// One record: its Wycheproof `tcId` (from the preceding `# tcId N:` comment, if
+    /// any) and its named, hex-decoded fields in file order.
     pub struct Record {
+        tc_id: Option<u32>,
         fields: Vec<(String, Vec<u8>)>,
     }
 
     impl Record {
+        /// The record's test-case id, or `None` if it had no `# tcId N:` comment.
+        pub fn tc_id(&self) -> Option<u32> {
+            self.tc_id
+        }
+
         /// The bytes of field `name`, or `None` if this record has no such field.
         pub fn field(&self, name: &str) -> Option<&[u8]> {
             self.fields
@@ -32,20 +39,28 @@ pub mod kat {
         }
     }
 
-    /// Splits KAT text into records. A blank line ends a record; `#` lines are
-    /// comments; every other line is `name = hex`. Panics on a malformed line,
-    /// which can only mean a corrupt static vector file.
+    /// Splits KAT text into records. A blank line ends a record; a `# tcId N:` comment
+    /// sets the next record's test-case id; other `#` lines are ignored; every other
+    /// line is `name = hex`. Panics on a malformed line, which can only mean a corrupt
+    /// static vector file.
     pub fn parse(text: &str) -> Vec<Record> {
         let mut records = Vec::new();
         let mut fields: Vec<(String, Vec<u8>)> = Vec::new();
+        let mut tc_id: Option<u32> = None;
         for line in text.lines() {
             let line = line.trim();
             if line.is_empty() {
                 if !fields.is_empty() {
                     records.push(Record {
+                        tc_id,
                         fields: std::mem::take(&mut fields),
                     });
+                    tc_id = None;
                 }
+                continue;
+            }
+            if let Some(rest) = line.strip_prefix("# tcId ") {
+                tc_id = rest.split(':').next().and_then(|n| n.trim().parse().ok());
                 continue;
             }
             if line.starts_with('#') {
@@ -55,7 +70,7 @@ pub mod kat {
             fields.push((name.trim().to_string(), hex_decode(value.trim())));
         }
         if !fields.is_empty() {
-            records.push(Record { fields });
+            records.push(Record { tc_id, fields });
         }
         records
     }
