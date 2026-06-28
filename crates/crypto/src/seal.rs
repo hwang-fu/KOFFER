@@ -129,6 +129,7 @@ mod tests {
     use super::*;
     use crate::aead::Aes256Gcm;
     use crate::hybrid::{X25519MlKem768, X25519MlKem1024};
+    use crate::kat::{assert_field, parse};
     use crate::kdf::Hkdf;
     use crate::mlkem::MlKem;
     use core::convert::Infallible;
@@ -275,4 +276,54 @@ mod tests {
 
         assert!(unseal(&kem, &kdf, &aead, &wrong_dk, &sealed, aad, &mut buf).is_err());
     }
+
+    const KAT_768: &str = include_str!("../../../kat/seal/self-consistency-768.kat");
+    const KAT_1024: &str = include_str!("../../../kat/seal/self-consistency-1024.kat");
+
+    macro_rules! seal_kat_test {
+        ($name:ident, $kem:expr, $kdf:expr, $kat:expr) => {
+            #[test]
+            fn $name() {
+                let records = parse($kat).unwrap();
+                let record = &records[0];
+                let kem = $kem;
+                let kdf = $kdf;
+                let aead = Aes256Gcm;
+
+                // keygen reproduces the frozen keypair.
+                let entropy = record.field("entropy").unwrap();
+                let (ek, dk) = kem.keygen(entropy).unwrap();
+                assert_field(record, "encapsulation_key", ek.as_slice());
+                assert_field(record, "decapsulation_key", dk.as_slice());
+
+                // seal (fixed RNG) reproduces the frozen components + ciphertext.
+                let plaintext = record.field("plaintext").unwrap();
+                let aad = record.field("aad").unwrap();
+                let mut buffer = plaintext.to_vec();
+                let mut rng = TestRng(0);
+                let sealed = seal(&kem, &kdf, &aead, &ek, aad, &mut buffer, &mut rng).unwrap();
+                assert_field(record, "kem_ciphertext", sealed.kem_ciphertext.as_slice());
+                assert_field(record, "nonce", sealed.nonce.as_slice());
+                assert_field(record, "ciphertext", &buffer);
+                assert_field(record, "tag", sealed.tag.as_slice());
+
+                // unseal recovers the plaintext.
+                unseal(&kem, &kdf, &aead, &dk, &sealed, aad, &mut buffer).unwrap();
+                assert_eq!(buffer.as_slice(), plaintext);
+            }
+        };
+    }
+
+    seal_kat_test!(
+        seal_kat_768,
+        MlKem::<ml_kem::MlKem768>::new(),
+        Hkdf::<Sha256>::new(),
+        KAT_768
+    );
+    seal_kat_test!(
+        seal_kat_1024,
+        MlKem::<ml_kem::MlKem1024>::new(),
+        Hkdf::<Sha384>::new(),
+        KAT_1024
+    );
 }
