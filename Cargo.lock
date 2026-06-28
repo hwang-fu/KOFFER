@@ -526,7 +526,9 @@ name = "koffer-difftest"
 version = "0.1.0"
 dependencies = [
  "koffer-crypto",
+ "ml-dsa",
  "oqs",
+ "proptest",
 ]
 
 [[package]]
