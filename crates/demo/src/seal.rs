@@ -8,11 +8,11 @@
 //! the KEM level (which identifies the profile), so the open side derives it from the KEM
 //! codepoint. The KEM is the hybrid X25519 + ML-KEM; the AEAD is AES-256-GCM.
 
-use crypto::aead::Aes256Gcm;
+use crypto::aead::{Aes256Gcm, Nonce, Tag};
 use crypto::alg::KemAlg;
 use crypto::hybrid::{X25519MlKem768, X25519MlKem1024};
 use crypto::kdf::Hkdf;
-use crypto::kem::{DecapsulationKey, EncapsulationKey};
+use crypto::kem::{Ciphertext, DecapsulationKey, EncapsulationKey};
 use crypto::profile::CryptoProfile;
 use crypto::seal::{Sealed, seal, unseal};
 use proto::alg::AlgId;
@@ -20,6 +20,9 @@ use proto::codec;
 use proto::cose::{CoseEncrypt, Recipient};
 use rand_core::CryptoRng;
 use sha2::{Sha256, Sha384};
+
+// AES-256-GCM authentication tag length; the body is framed as `ciphertext || tag`.
+const TAG_LEN: usize = 16;
 
 /// Seals `plaintext` to a fresh recipient keypair under `profile` and frames it as an
 /// encoded `COSE_Encrypt`. Returns the encoding and the decapsulation key that opens it.
@@ -52,6 +55,37 @@ pub fn seal_payload(
         codec::encode(&cose).expect("encode COSE_Encrypt"),
         decapsulation_key,
     )
+}
+
+/// Opens an encoded `COSE_Encrypt` with `decapsulation_key`, recovering the plaintext. The
+/// KEM/AEAD backends are chosen purely from the wire codepoints; `None` on any failure.
+pub fn open_payload(
+    cose_bytes: &[u8],
+    decapsulation_key: &DecapsulationKey,
+    aad: &[u8],
+) -> Option<Vec<u8>> {
+    let cose = codec::decode::<CoseEncrypt>(cose_bytes).ok()?;
+    let recipient = cose.recipient();
+    let body = cose.ciphertext();
+    if body.len() < TAG_LEN {
+        return None;
+    }
+    let (ciphertext, tag) = body.split_at(body.len() - TAG_LEN);
+    let sealed = Sealed {
+        kem_ciphertext: Ciphertext::try_from(recipient.encapsulation()).ok()?,
+        nonce: Nonce::try_from(cose.nonce()).ok()?,
+        tag: Tag::try_from(tag).ok()?,
+    };
+
+    let mut buffer = ciphertext.to_vec();
+    unseal_from_codepoint(
+        recipient.kem_alg(),
+        decapsulation_key,
+        &sealed,
+        aad,
+        &mut buffer,
+    )
+    .then_some(buffer)
 }
 
 // Per-scheme knowledge lives only in the three helpers below; the flow never names a scheme.
