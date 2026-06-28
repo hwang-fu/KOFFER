@@ -50,6 +50,16 @@ cargo build --target thumbv8m.main-none-eabihf -p koffer-base -p koffer-proto -p
 
 The toolchain -- Rust 1.96.0, the `clippy` and `rustfmt` components, and the `thumbv8m.main-none-eabihf` target -- is pinned in `rust-toolchain.toml`, so `rustup` provisions it automatically on the first build.
 
+## Demo
+
+Run the full sign/verify and seal/open flow in software, in both crypto profiles:
+
+```sh
+cargo run -p koffer-demo
+```
+
+See [docs/demo.md](docs/demo.md) for a step-by-step walkthrough.
+
 ## Editor setup
 
 `rust-analyzer` is an editor tool rather than a build component, so it is deliberately not pinned in `rust-toolchain.toml`. If your editor runs the `rustup`-proxied `rust-analyzer`, the pin makes it resolve against `1.96.0`, which does not ship the component, so the language server fails to start in this repo. Add it to the pinned toolchain once, **from inside the repo** so the toolchain override targets the right version:
