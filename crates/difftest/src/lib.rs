@@ -247,3 +247,34 @@ pub fn our_decapsulate(set: MlKemSet, seed: &[u8], ciphertext: &[u8]) -> Option<
         MlKemSet::MlKem1024 => decapsulate_with!(ml_kem::MlKem1024),
     }
 }
+
+/// The two backends produced different shared secrets for the same input -- a finding.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KemMismatch {
+    /// What our backend produced (`None` = it treated the input as malformed).
+    pub ours: Option<Vec<u8>>,
+    /// What the reference produced.
+    pub reference: Option<Vec<u8>>,
+}
+
+/// Runs our backend and `reference` decapsulate on the same input and compares them.
+///
+/// `Ok(secret)` means they agree (the shared secret, or `None` if both rejected the
+/// input as malformed); `Err(KemMismatch)` means they disagree.
+pub fn differential_decapsulate(
+    reference: &dyn MlKemReference,
+    set: MlKemSet,
+    seed: &[u8],
+    ciphertext: &[u8],
+) -> Result<Option<Vec<u8>>, KemMismatch> {
+    let ours = our_decapsulate(set, seed, ciphertext);
+    let theirs = reference.decapsulate(set, seed, ciphertext);
+    if ours == theirs {
+        Ok(ours)
+    } else {
+        Err(KemMismatch {
+            ours,
+            reference: theirs,
+        })
+    }
+}
