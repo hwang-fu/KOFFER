@@ -5,7 +5,9 @@
 //! a randomized implicit-rejection proptest, and a meta-test proving the harness
 //! catches a disagreeing reference.
 
-use koffer_difftest::{MlKemSet, OqsMlKem, differential_decapsulate, kat};
+use koffer_difftest::{
+    KemMismatch, MlKemReference, MlKemSet, OqsMlKem, differential_decapsulate, kat,
+};
 use proptest::prelude::*;
 
 const KEM_768: &str = include_str!("../../../kat/mlkem/wycheproof-768.kat");
@@ -53,5 +55,35 @@ proptest! {
         let agreed = differential_decapsulate(&OqsMlKem, MlKemSet::MlKem768, &SEED, &ciphertext)
             .expect("backends agree on a random ciphertext");
         prop_assert!(agreed.is_some());
+    }
+}
+
+// A deliberately-wrong reference that returns a fixed bogus secret.
+struct WrongSecret;
+
+impl MlKemReference for WrongSecret {
+    fn decapsulate(&self, _set: MlKemSet, _seed: &[u8], _ciphertext: &[u8]) -> Option<Vec<u8>> {
+        Some(vec![0u8; 32])
+    }
+}
+
+#[test]
+fn differential_catches_a_wrong_reference() {
+    // On a real vector our backend returns the true secret while `WrongSecret` returns
+    // zeros, so the differential must surface a mismatch instead of a false agreement.
+    let records = kat::parse(KEM_768);
+    let r = records.first().expect("at least one vector");
+    let expected = r.field("shared_secret").unwrap();
+    match differential_decapsulate(
+        &WrongSecret,
+        MlKemSet::MlKem768,
+        r.field("seed").unwrap(),
+        r.field("ciphertext").unwrap(),
+    ) {
+        Err(KemMismatch { ours, reference }) => {
+            assert_eq!(ours.as_deref(), Some(expected));
+            assert_eq!(reference, Some(vec![0u8; 32]));
+        }
+        Ok(_) => panic!("differential failed to catch the wrong reference"),
     }
 }
