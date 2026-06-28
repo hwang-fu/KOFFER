@@ -182,3 +182,43 @@ pub fn differential_verify(
         })
     }
 }
+
+/// The ML-KEM parameter set under test.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MlKemSet {
+    /// ML-KEM-768 (showcase profile).
+    MlKem768,
+    /// ML-KEM-1024 (CNSA 2.0 profile).
+    MlKem1024,
+}
+
+/// An independent ML-KEM decapsulator -- the reference side of the differential.
+///
+/// `decapsulate` derives the keypair from `seed` (the same seed our backend uses),
+/// then recovers the shared secret for `ciphertext`. A wrong-length seed or ciphertext
+/// is `None`, not a panic, so malformed inputs compare cleanly against our backend.
+pub trait MlKemReference {
+    /// The shared secret from decapsulating `ciphertext` under the keypair derived from
+    /// `seed`, or `None` if an input is the wrong length.
+    fn decapsulate(&self, set: MlKemSet, seed: &[u8], ciphertext: &[u8]) -> Option<Vec<u8>>;
+}
+
+/// The liboqs reference, via the `oqs` crate.
+pub struct OqsMlKem;
+
+impl MlKemReference for OqsMlKem {
+    fn decapsulate(&self, set: MlKemSet, seed: &[u8], ciphertext: &[u8]) -> Option<Vec<u8>> {
+        oqs::init();
+        let algorithm = match set {
+            MlKemSet::MlKem768 => oqs::kem::Algorithm::MlKem768,
+            MlKemSet::MlKem1024 => oqs::kem::Algorithm::MlKem1024,
+        };
+        let kem = oqs::kem::Kem::new(algorithm).expect("oqs is built with ML-KEM enabled");
+        // liboqs derives its keypair from the same seed. A wrong-length seed or
+        // ciphertext is a malformed input, matching our backend.
+        let seed = kem.keypair_seed_from_bytes(seed)?;
+        let (_encapsulation_key, secret_key) = kem.keypair_derand(seed).ok()?;
+        let ciphertext = kem.ciphertext_from_bytes(ciphertext)?;
+        Some(kem.decapsulate(&secret_key, ciphertext).ok()?.into_vec())
+    }
+}
