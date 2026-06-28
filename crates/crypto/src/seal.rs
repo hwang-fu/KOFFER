@@ -10,8 +10,13 @@
 use crate::{
     aead,
     error::{AeadError, KdfError, KemError},
-    kem::Ciphertext,
+    kdf::Kdf,
+    kem::{Ciphertext, SharedSecret},
 };
+use zeroize::Zeroize;
+
+/// Domain-separation label bound into the key/nonce derivation.
+const LABEL: &[u8] = b"koffer-seal-v1";
 
 /// The raw components of a sealed payload (the ciphertext stays in the caller's buffer).
 ///
@@ -56,4 +61,22 @@ impl From<AeadError> for SealError {
     fn from(e: AeadError) -> Self {
         SealError::Aead(e)
     }
+}
+
+/// Derives the AEAD key and nonce from the KEM shared secret.
+///
+/// One KDF expansion bound to a fixed domain-separation label; the output is split into the
+/// key and the nonce. The scratch buffer is zeroized before returning. The shared secret is
+/// already bound to the exact KEM ciphertext by the KEM itself (ML-KEM's implicit rejection /
+/// the hybrid combiner), so the ciphertext is not re-bound here.
+fn derive_key_nonce<D: Kdf>(
+    kdf: &D,
+    shared_secret: &SharedSecret,
+) -> Result<(aead::Key, aead::Nonce), SealError> {
+    let mut okm = [0u8; aead::KEY_LEN + aead::NONCE_LEN];
+    kdf.derive(&[], shared_secret.as_slice(), LABEL, &mut okm)?;
+    let key = aead::Key::try_from(&okm[..aead::KEY_LEN]).map_err(|_| SealError::Internal)?;
+    let nonce = aead::Nonce::try_from(&okm[aead::KEY_LEN..]).map_err(|_| SealError::Internal)?;
+    okm.zeroize();
+    Ok((key, nonce))
 }
