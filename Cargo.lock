@@ -402,6 +402,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "koffer-difftest"
+version = "0.1.0"
+dependencies = [
+ "koffer-crypto",
+]
+
+[[package]]
 name = "koffer-proto"
 version = "0.1.0"
 dependencies = [

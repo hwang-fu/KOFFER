@@ -1,0 +1,9 @@
+[package]
+name = "koffer-difftest"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[dependencies]
+crypto = { version = "0.1.0", path = "../crypto", package = "koffer-crypto", features = ["std"] }
