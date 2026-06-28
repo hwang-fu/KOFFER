@@ -522,6 +522,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "koffer-demo"
+version = "0.1.0"
+dependencies = [
+ "koffer-crypto",
+ "koffer-proto",
+ "ml-dsa",
+ "rand_core 0.10.1",
+ "sha2",
+]
+
+[[package]]
 name = "koffer-difftest"
 version = "0.1.0"
 dependencies = [
