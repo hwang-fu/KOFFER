@@ -18,9 +18,9 @@ use crate::error::AeadError;
 
 // AES-256-GCM fixed sizes. A future ChaCha20-Poly1305 backend shares all three,
 // so these bounds are exact for every AEAD this crate plans to support.
-const KEY_LEN: usize = 32; // AES-256 key
-const NONCE_LEN: usize = 12; // 96-bit GCM nonce
-const TAG_LEN: usize = 16; // 128-bit GCM tag
+pub const KEY_LEN: usize = 32; // AES-256 key
+pub const NONCE_LEN: usize = 12; // 96-bit GCM nonce
+pub const TAG_LEN: usize = 16; // 128-bit GCM tag
 
 secret_bytes_newtype! {
     /// A symmetric AEAD key, as raw bytes. 32 bytes for AES-256-GCM.

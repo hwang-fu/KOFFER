@@ -95,6 +95,7 @@ pub mod lms;
 pub mod mldsa;
 pub mod mlkem;
 pub mod profile;
+pub mod seal;
 pub mod sign;
 
 mod x25519;
