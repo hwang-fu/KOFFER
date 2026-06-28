@@ -224,6 +224,62 @@ impl MlKemReference for OqsMlKem {
     }
 }
 
+// FFI to the vendored mlkem-native multilevel build (`build.rs` compiles it). Each level
+// exposes a derandomized keypair (from 64-byte coins) and a decapsulate; both return 0 on
+// success.
+unsafe extern "C" {
+    fn mlkem768_keypair_derand(pk: *mut u8, sk: *mut u8, coins: *const u8) -> core::ffi::c_int;
+    fn mlkem768_dec(ss: *mut u8, ct: *const u8, sk: *const u8) -> core::ffi::c_int;
+    fn mlkem1024_keypair_derand(pk: *mut u8, sk: *mut u8, coins: *const u8) -> core::ffi::c_int;
+    fn mlkem1024_dec(ss: *mut u8, ct: *const u8, sk: *const u8) -> core::ffi::c_int;
+}
+
+/// The mlkem-native reference (vendored, formally-verified C), the higher-assurance ML-KEM
+/// cross-check alongside liboqs.
+pub struct MlKemNative;
+
+impl MlKemReference for MlKemNative {
+    fn decapsulate(&self, set: MlKemSet, seed: &[u8], ciphertext: &[u8]) -> Option<Vec<u8>> {
+        // The seed is the 64-byte FIPS 203 keygen coins (d || z); a wrong length is a
+        // malformed input, matching our backend.
+        let coins: [u8; 64] = seed.try_into().ok()?;
+
+        // Buffer sizes are fixed per parameter set, so expand per level. `pk` is written by
+        // the keypair derivation but unused afterward -- only `sk` feeds decapsulation.
+        macro_rules! decapsulate_with {
+            ($pk_len:literal, $sk_len:literal, $ct_len:literal, $keypair:ident, $dec:ident) => {{
+                if ciphertext.len() != $ct_len {
+                    return None;
+                }
+                let mut pk = [0u8; $pk_len];
+                let mut sk = [0u8; $sk_len];
+                let mut shared_secret = [0u8; 32];
+                // SAFETY: each pointer is valid for the fixed length the C function reads or
+                // writes -- `coins` is 64 bytes, `ciphertext` is the checked length, and the
+                // `pk`/`sk`/`shared_secret` buffers are sized to the parameter set.
+                unsafe {
+                    if $keypair(pk.as_mut_ptr(), sk.as_mut_ptr(), coins.as_ptr()) != 0 {
+                        return None;
+                    }
+                    if $dec(shared_secret.as_mut_ptr(), ciphertext.as_ptr(), sk.as_ptr()) != 0 {
+                        return None;
+                    }
+                }
+                Some(shared_secret.to_vec())
+            }};
+        }
+
+        match set {
+            MlKemSet::MlKem768 => {
+                decapsulate_with!(1184, 2400, 1088, mlkem768_keypair_derand, mlkem768_dec)
+            }
+            MlKemSet::MlKem1024 => {
+                decapsulate_with!(1568, 3168, 1568, mlkem1024_keypair_derand, mlkem1024_dec)
+            }
+        }
+    }
+}
+
 /// Decapsulates with our `koffer-crypto` ML-KEM backend -- the implementation under test.
 ///
 /// Derives the keypair from `seed`, then recovers the shared secret for `ciphertext`.
