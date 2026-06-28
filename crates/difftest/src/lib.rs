@@ -85,3 +85,6 @@ pub trait MlDsaReference {
     /// Whether the reference accepts `signature` over `message` under `public_key`.
     fn verify(&self, set: MlDsaSet, public_key: &[u8], message: &[u8], signature: &[u8]) -> bool;
 }
+
+/// The liboqs reference, via the `oqs` crate.
+pub struct OqsMlDsa;
