@@ -88,3 +88,22 @@ pub trait MlDsaReference {
 
 /// The liboqs reference, via the `oqs` crate.
 pub struct OqsMlDsa;
+
+impl MlDsaReference for OqsMlDsa {
+    fn verify(&self, set: MlDsaSet, public_key: &[u8], message: &[u8], signature: &[u8]) -> bool {
+        oqs::init();
+        let algorithm = match set {
+            MlDsaSet::MlDsa65 => oqs::sig::Algorithm::MlDsa65,
+            MlDsaSet::MlDsa87 => oqs::sig::Algorithm::MlDsa87,
+        };
+        let scheme = oqs::sig::Sig::new(algorithm).expect("oqs is built with ML-DSA enabled");
+        // A wrong-length key or signature is a rejection, matching our backend.
+        let (Some(pk), Some(sig)) = (
+            scheme.public_key_from_bytes(public_key),
+            scheme.signature_from_bytes(signature),
+        ) else {
+            return false;
+        };
+        scheme.verify(message, sig, pk).is_ok()
+    }
+}
