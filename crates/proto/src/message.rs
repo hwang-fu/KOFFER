@@ -91,7 +91,7 @@ pub enum Request<'b> {
     /// Sign a digest with the given algorithm (`-> Response::CoseSign1`).
     Sign {
         /// Signature algorithm to use.
-        alg: AlgId,
+        sig_alg: AlgId,
         /// The digest to sign.
         digest: SuitDigest<'b>,
         /// Human-readable summary shown on the device display for consent.
@@ -132,12 +132,12 @@ impl<C> minicbor::Encode<C> for Request<'_> {
                 kem_alg.encode(e, ctx)?;
             }
             Request::Sign {
-                alg,
+                sig_alg,
                 digest,
                 summary,
             } => {
                 e.array(4)?.u8(RequestTag::Sign as u8)?;
-                alg.encode(e, ctx)?;
+                sig_alg.encode(e, ctx)?;
                 digest.encode(e, ctx)?;
                 summary.encode(e, ctx)?;
             }
@@ -180,11 +180,11 @@ impl<'b, C> minicbor::Decode<'b, C> for Request<'b> {
             }
             RequestTag::Sign => {
                 expect_len(len, 4)?;
-                let alg = d.decode()?;
+                let sig_alg = d.decode()?;
                 let digest = d.decode()?;
                 let summary = d.decode()?;
                 Ok(Request::Sign {
-                    alg,
+                    sig_alg,
                     digest,
                     summary,
                 })
@@ -543,7 +543,7 @@ mod tests {
         let digest = SuitDigest::new(AlgId::new(-16), &digest_bytes);
         let summary = AsciiStr::try_from("sign firmware v2").unwrap();
         round_trip_request(Request::Sign {
-            alg: AlgId::new(-7),
+            sig_alg: AlgId::new(-7),
             digest,
             summary,
         });
@@ -728,7 +728,7 @@ mod tests {
         let dbytes = [0xAA, 0xBB, 0xCC, 0xDD];
         check_request_kat(
             Request::Sign {
-                alg: AlgId::new(-7),
+                sig_alg: AlgId::new(-7),
                 digest: SuitDigest::new(AlgId::new(-16), &dbytes),
                 summary: AsciiStr::try_from("sign").unwrap(),
             },
