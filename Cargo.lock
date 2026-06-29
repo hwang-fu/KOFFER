@@ -662,6 +662,7 @@ dependencies = [
  "hbs-lms",
  "hkdf",
  "koffer-base",
+ "koffer-testutil",
  "ml-dsa",
  "ml-kem",
  "proptest",

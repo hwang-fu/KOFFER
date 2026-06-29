@@ -198,9 +198,8 @@ mod tests {
     use super::*;
     use crate::kat::{assert_field, parse};
     use crate::kdf::Hkdf;
-    use core::convert::Infallible;
+    use koffer_testutil::CounterRng;
     use proptest::prelude::*;
-    use rand_core::{TryCryptoRng, TryRng};
     use sha2::Sha256;
 
     const SS_MLKEM: [u8; 32] = [0x01; 32];
@@ -243,28 +242,6 @@ mod tests {
     const KAT_768: &str = include_str!("../../../kat/hybrid/self-consistency-768.kat");
     const KAT_1024: &str = include_str!("../../../kat/hybrid/self-consistency-1024.kat");
 
-    /// Deterministic counter RNG, so encapsulation reproduces the frozen vector.
-    struct TestRng(u64);
-
-    impl TryRng for TestRng {
-        type Error = Infallible;
-        fn try_next_u32(&mut self) -> Result<u32, Infallible> {
-            Ok(self.try_next_u64()? as u32)
-        }
-        fn try_next_u64(&mut self) -> Result<u64, Infallible> {
-            self.0 = self.0.wrapping_add(1);
-            Ok(self.0)
-        }
-        fn try_fill_bytes(&mut self, dst: &mut [u8]) -> Result<(), Infallible> {
-            for chunk in dst.chunks_mut(8) {
-                let value = self.try_next_u64()?.to_le_bytes();
-                chunk.copy_from_slice(&value[..chunk.len()]);
-            }
-            Ok(())
-        }
-    }
-    impl TryCryptoRng for TestRng {}
-
     macro_rules! self_consistency_test {
         ($name:ident, $backend:expr, $kat:expr) => {
             #[test]
@@ -280,7 +257,7 @@ mod tests {
                 assert_field(record, "decapsulation_key", dk.as_slice());
 
                 // encapsulate (fixed RNG) reproduces the frozen ciphertext + secret.
-                let mut rng = TestRng(0);
+                let mut rng = CounterRng::new(0);
                 let (ct, ss) = backend.encapsulate(&ek, &mut rng).unwrap();
                 assert_field(record, "ciphertext", ct.as_slice());
                 assert_field(record, "shared_secret", ss.as_slice());
@@ -308,7 +285,7 @@ mod tests {
                 ) {
                     let backend = $backend;
                     let (ek, dk) = backend.keygen(&entropy).unwrap();
-                    let mut rng = TestRng(seed);
+                    let mut rng = CounterRng::new(seed);
                     let (ct, ss) = backend.encapsulate(&ek, &mut rng).unwrap();
                     let recovered = backend.decapsulate(&dk, &ct).unwrap();
                     prop_assert_eq!(ss.as_slice(), recovered.as_slice());
@@ -330,7 +307,7 @@ mod tests {
                 let backend = $backend;
                 let entropy = [0x07u8; 96];
                 let (ek, dk) = backend.keygen(&entropy).unwrap();
-                let mut rng = TestRng(0);
+                let mut rng = CounterRng::new(0);
                 let (ct, ss) = backend.encapsulate(&ek, &mut rng).unwrap();
 
                 // Baseline: the untouched ciphertext recovers the secret.

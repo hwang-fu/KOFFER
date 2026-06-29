@@ -31,4 +31,5 @@ zeroize = { version = "1.9.0", default-features = false }
 
 [dev-dependencies]
 dudect-bencher = "0.7.0"
+koffer-testutil = { path = "../testutil" }
 proptest = "1.11.0"
