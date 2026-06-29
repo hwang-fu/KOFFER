@@ -196,12 +196,14 @@ mod tests {
     use crate::kat::{assert_field, parse};
     use proptest::prelude::*;
 
-    const CAVP: &str = include_str!("../../../kat/aead/cavp-aes-256-gcm.kat");
+    const CAVP_AES_256_GCM: &str = include_str!("../../../kat/aead/cavp-aes-256-gcm.kat");
+    const RFC8439_CHACHA20_POLY1305: &str =
+        include_str!("../../../kat/aead/rfc8439-chacha20-poly1305.kat");
 
-    #[test]
-    fn cavp_aes_256_gcm_vectors() {
-        let records = parse(CAVP).unwrap();
-        let backend = Aes256Gcm;
+    // Runs the published known-answer vectors in `kat_text` against `backend`: seal must
+    // reproduce each record's ciphertext and tag, and open must recover the plaintext.
+    fn check_kat(backend: &dyn Aead, kat_text: &str) {
+        let records = parse(kat_text).unwrap();
         for record in &records {
             let key = Key::try_from(record.field("key").unwrap()).unwrap();
             let nonce = Nonce::try_from(record.field("nonce").unwrap()).unwrap();
@@ -219,6 +221,16 @@ mod tests {
             backend.open(&key, &nonce, aad, &mut buffer, &tag).unwrap();
             assert_eq!(buffer.as_slice(), plaintext);
         }
+    }
+
+    #[test]
+    fn cavp_aes_256_gcm_vectors() {
+        check_kat(&Aes256Gcm, CAVP_AES_256_GCM);
+    }
+
+    #[test]
+    fn rfc8439_chacha20_poly1305_vectors() {
+        check_kat(&ChaCha20Poly1305, RFC8439_CHACHA20_POLY1305);
     }
 
     // The tests below exercise the `Aead` contract itself, so each runs through a `&dyn Aead`
