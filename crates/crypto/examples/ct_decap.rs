@@ -8,6 +8,11 @@
 //! class decapsulates random ciphertexts of the correct length -- well-formed but invalid,
 //! so decapsulation takes the FIPS 203 implicit-rejection path. If the valid path and the
 //! rejection path differ in timing, dudect flags it.
+//!
+//! Two benches run. `ct_decap` measures real decapsulation and should report a small t (no
+//! leak). `leak_canary` is a deliberately secret-dependent function and must report a large
+//! t. The canary proves the harness can actually detect a leak, so a small `ct_decap` t is
+//! meaningful rather than just "the detector never fires."
 
 use core::convert::Infallible;
 
@@ -77,4 +82,33 @@ fn ct_decap(runner: &mut CtRunner, rng: &mut BenchRng) {
     }
 }
 
-ctbench_main!(ct_decap);
+// The negative meta-test ("leak canary"). NOT real crypto: a deliberately secret-dependent
+// function whose timing depends on a secret byte, so dudect must flag it with a large t. It
+// validates the detector -- without it, a harness that never fires would look identical to a
+// clean constant-time result.
+fn leak_canary(runner: &mut CtRunner, rng: &mut BenchRng) {
+    for _ in 0..SAMPLES {
+        // Left: secret 0 -> fast path. Right: a random nonzero secret -> slow, secret-
+        // dependent path. The systematic gap between the two classes is the injected leak.
+        let (class, secret) = if rng.random::<bool>() {
+            (Class::Left, 0u8)
+        } else {
+            (Class::Right, rng.random::<u8>() | 1)
+        };
+        runner.run_one(class, || leaky_branch(secret));
+    }
+}
+
+// The branch on the secret. The slow path does clearly more work, so the timing gap
+// dominates measurement noise and the reported t is large on any machine.
+fn leaky_branch(secret: u8) -> u64 {
+    let mut acc = 0u64;
+    if secret != 0 {
+        for i in 0..4096u64 {
+            acc = acc.wrapping_add(core::hint::black_box(i));
+        }
+    }
+    core::hint::black_box(acc)
+}
+
+ctbench_main!(ct_decap, leak_canary);
