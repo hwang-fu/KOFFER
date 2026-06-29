@@ -94,8 +94,8 @@ pub enum Request<'b> {
         sig_alg: AlgId,
         /// The digest to sign.
         digest: SuitDigest<'b>,
-        /// Human-readable summary shown on the device display for consent.
-        summary: AsciiStr<'b>,
+        /// Human-readable consent prompt shown on the device display.
+        prompt: AsciiStr<'b>,
     },
     /// Install an encrypted firmware image (`-> Response::BootDecision`).
     InstallEncryptedImage {
@@ -134,12 +134,12 @@ impl<C> minicbor::Encode<C> for Request<'_> {
             Request::Sign {
                 sig_alg,
                 digest,
-                summary,
+                prompt,
             } => {
                 e.array(4)?.u8(RequestTag::Sign as u8)?;
                 sig_alg.encode(e, ctx)?;
                 digest.encode(e, ctx)?;
-                summary.encode(e, ctx)?;
+                prompt.encode(e, ctx)?;
             }
             Request::InstallEncryptedImage { image, manifest } => {
                 e.array(3)?.u8(RequestTag::InstallEncryptedImage as u8)?;
@@ -182,11 +182,11 @@ impl<'b, C> minicbor::Decode<'b, C> for Request<'b> {
                 expect_len(len, 4)?;
                 let sig_alg = d.decode()?;
                 let digest = d.decode()?;
-                let summary = d.decode()?;
+                let prompt = d.decode()?;
                 Ok(Request::Sign {
                     sig_alg,
                     digest,
-                    summary,
+                    prompt,
                 })
             }
             RequestTag::InstallEncryptedImage => {
@@ -541,11 +541,11 @@ mod tests {
     fn request_sign_round_trips() {
         let digest_bytes = [0x55u8; 32];
         let digest = SuitDigest::new(AlgId::new(-16), &digest_bytes);
-        let summary = AsciiStr::try_from("sign firmware v2").unwrap();
+        let prompt = AsciiStr::try_from("sign firmware v2").unwrap();
         round_trip_request(Request::Sign {
             sig_alg: AlgId::new(-7),
             digest,
-            summary,
+            prompt,
         });
     }
 
@@ -730,7 +730,7 @@ mod tests {
             Request::Sign {
                 sig_alg: AlgId::new(-7),
                 digest: SuitDigest::new(AlgId::new(-16), &dbytes),
-                summary: AsciiStr::try_from("sign").unwrap(),
+                prompt: AsciiStr::try_from("sign").unwrap(),
             },
             "840426822f44aabbccdd647369676e",
         );
