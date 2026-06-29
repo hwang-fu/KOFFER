@@ -1,4 +1,4 @@
-//! Authenticated encryption (AEAD) value types and the AES-256-GCM backend.
+//! Authenticated encryption (AEAD) value types and the AES-256-GCM and ChaCha20-Poly1305 backends.
 //!
 //! "Authenticated encryption with associated data" gives confidentiality and
 //! tamper-detection together: `open` decrypts only if the ciphertext and the
