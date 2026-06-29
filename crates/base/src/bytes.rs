@@ -13,17 +13,26 @@ pub enum BytesError {
     TooLong { len: usize, max: usize },
     /// An exact-length constructor received a sequence of the wrong length.
     WrongLength { expected: usize, got: usize },
+    /// A hex string contained a character that is not a hex digit.
+    BadHex { index: usize },
+    /// A hex string had an odd number of characters.
+    OddLength { len: usize },
 }
 
 impl fmt::Display for BytesError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             BytesError::TooLong { len, max } => {
-                write!(f, "byte sequence of {len} bytes exceeds the maximum of {max}")
+                write!(
+                    f,
+                    "byte sequence of {len} bytes exceeds the maximum of {max}"
+                )
             }
             BytesError::WrongLength { expected, got } => {
                 write!(f, "expected exactly {expected} bytes, got {got}")
             }
+            BytesError::BadHex { index } => write!(f, "non-hex character at index {index}"),
+            BytesError::OddLength { len } => write!(f, "hex string has an odd length of {len}"),
         }
     }
 }
@@ -62,6 +71,29 @@ impl<const MAX: usize> Bytes<MAX> {
         }
         Self::try_from(bytes) // len == MAX, so this cannot be TooLong
     }
+
+    /// Parses a hex string into a buffer, rejecting a non-hex character, an odd length,
+    /// or more than `MAX` decoded bytes.
+    pub fn from_hex(hex: &str) -> Result<Self, BytesError> {
+        let hex = hex.as_bytes();
+        if !hex.len().is_multiple_of(2) {
+            return Err(BytesError::OddLength { len: hex.len() });
+        }
+        let mut out = heapless::Vec::<u8, MAX>::new();
+        for (pair_index, pair) in hex.chunks_exact(2).enumerate() {
+            let hi = nibble(pair[0]).ok_or(BytesError::BadHex {
+                index: 2 * pair_index,
+            })?;
+            let lo = nibble(pair[1]).ok_or(BytesError::BadHex {
+                index: 2 * pair_index + 1,
+            })?;
+            out.push((hi << 4) | lo).map_err(|_| BytesError::TooLong {
+                len: hex.len() / 2,
+                max: MAX,
+            })?;
+        }
+        Ok(Self(out))
+    }
 }
 
 impl<const MAX: usize> TryFrom<&[u8]> for Bytes<MAX> {
@@ -74,6 +106,16 @@ impl<const MAX: usize> TryFrom<&[u8]> for Bytes<MAX> {
                 len: bytes.len(),
                 max: MAX,
             })
+    }
+}
+
+/// Decodes one ASCII hex digit to its 4-bit value.
+fn nibble(c: u8) -> Option<u8> {
+    match c {
+        b'0'..=b'9' => Some(c - b'0'),
+        b'a'..=b'f' => Some(c - b'a' + 10),
+        b'A'..=b'F' => Some(c - b'A' + 10),
+        _ => None,
     }
 }
 
@@ -146,11 +188,37 @@ mod tests {
         assert!(Bytes::<4>::try_from_exact(&[1, 2, 3, 4]).is_ok());
         assert_eq!(
             Bytes::<4>::try_from_exact(&[1, 2, 3]),
-            Err(BytesError::WrongLength { expected: 4, got: 3 })
+            Err(BytesError::WrongLength {
+                expected: 4,
+                got: 3
+            })
         );
         assert_eq!(
             Bytes::<4>::try_from_exact(&[1, 2, 3, 4, 5]),
-            Err(BytesError::WrongLength { expected: 4, got: 5 })
+            Err(BytesError::WrongLength {
+                expected: 4,
+                got: 5
+            })
+        );
+    }
+
+    #[test]
+    fn from_hex_parses_and_rejects() {
+        assert_eq!(
+            Bytes::<4>::from_hex("01aB").unwrap().as_slice(),
+            &[0x01, 0xab]
+        );
+        assert_eq!(
+            Bytes::<4>::from_hex("0"),
+            Err(BytesError::OddLength { len: 1 })
+        );
+        assert_eq!(
+            Bytes::<4>::from_hex("0g"),
+            Err(BytesError::BadHex { index: 1 })
+        );
+        assert_eq!(
+            Bytes::<2>::from_hex("01020304"),
+            Err(BytesError::TooLong { len: 4, max: 2 })
         );
     }
 
