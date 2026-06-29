@@ -106,7 +106,7 @@ pub enum Request<'b> {
         manifest: Manifest<'b>,
     },
     /// Request a signed attestation over a challenge nonce (`-> Response::Attestation`).
-    Attest { nonce: &'b [u8] },
+    Attest { challenge: &'b [u8] },
 }
 
 impl<C> minicbor::Encode<C> for Request<'_> {
@@ -146,9 +146,9 @@ impl<C> minicbor::Encode<C> for Request<'_> {
                 image.encode(e, ctx)?;
                 manifest.encode(e, ctx)?;
             }
-            Request::Attest { nonce } => {
+            Request::Attest { challenge } => {
                 e.array(2)?.u8(RequestTag::Attest as u8)?;
-                e.bytes(nonce)?;
+                e.bytes(challenge)?;
             }
         }
         Ok(())
@@ -197,8 +197,8 @@ impl<'b, C> minicbor::Decode<'b, C> for Request<'b> {
             }
             RequestTag::Attest => {
                 expect_len(len, 2)?;
-                let nonce = d.bytes()?;
-                Ok(Request::Attest { nonce })
+                let challenge = d.bytes()?;
+                Ok(Request::Attest { challenge })
             }
         }
     }
@@ -450,7 +450,7 @@ mod tests {
         assert_eq!(
             r,
             Request::Attest {
-                nonce: &[0xAA, 0xBB, 0xCC],
+                challenge: &[0xAA, 0xBB, 0xCC],
             }
         );
     }
@@ -568,8 +568,8 @@ mod tests {
     #[cfg(feature = "alloc")]
     #[test]
     fn request_attest_round_trips() {
-        let nonce = [0x99u8; 16];
-        round_trip_request(Request::Attest { nonce: &nonce });
+        let challenge = [0x99u8; 16];
+        round_trip_request(Request::Attest { challenge: &challenge });
     }
 
     #[cfg(feature = "alloc")]
@@ -751,8 +751,8 @@ mod tests {
             Request::InstallEncryptedImage { image, manifest },
             "83058443a10103a10542aabb42cdce818344a101382fa042eeffa50101020103636b6f6604822f42abcd0500",
         );
-        let nonce = [0x99, 0x88];
-        check_request_kat(Request::Attest { nonce: &nonce }, "8206429988");
+        let challenge = [0x99, 0x88];
+        check_request_kat(Request::Attest { challenge: &challenge }, "8206429988");
         let hp = [0x01, 0x02];
         check_request_kat(Request::Handshake { payload: &hp }, "8201420102");
     }
