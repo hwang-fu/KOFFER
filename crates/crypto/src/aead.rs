@@ -251,6 +251,7 @@ mod tests {
             let key = Key::try_from(&key[..]).unwrap();
             let nonce = Nonce::try_from(&nonce[..]).unwrap();
             check_roundtrip(&Aes256Gcm, &key, &nonce, &aad, &plaintext)?;
+            check_roundtrip(&ChaCha20Poly1305, &key, &nonce, &aad, &plaintext)?;
         }
     }
 
@@ -315,20 +316,24 @@ mod tests {
     #[test]
     fn open_rejects_tampered_ciphertext() {
         check_rejects_tampered_ciphertext(&Aes256Gcm);
+        check_rejects_tampered_ciphertext(&ChaCha20Poly1305);
     }
 
     #[test]
     fn open_rejects_tampered_tag() {
         check_rejects_tampered_tag(&Aes256Gcm);
+        check_rejects_tampered_tag(&ChaCha20Poly1305);
     }
 
     #[test]
     fn open_rejects_tampered_aad() {
         check_rejects_tampered_aad(&Aes256Gcm);
+        check_rejects_tampered_aad(&ChaCha20Poly1305);
     }
 
     #[test]
     fn rejects_malformed_key_and_nonce() {
         check_rejects_malformed_key_and_nonce(&Aes256Gcm);
+        check_rejects_malformed_key_and_nonce(&ChaCha20Poly1305);
     }
 }
