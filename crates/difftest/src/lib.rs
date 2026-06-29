@@ -10,8 +10,10 @@
 //! and its (potentially C-backed) reference libraries are excluded by
 //! construction.
 
-use crypto::kem::{Ciphertext, Kem};
-use crypto::sign::{Signature, Verifier, VerifyingKey};
+use crypto::{
+    kem::{Ciphertext, Kem},
+    sign::{Signature, Verifier, VerifyingKey},
+};
 
 /// Parser for the project's `name = hex` known-answer-test files.
 ///

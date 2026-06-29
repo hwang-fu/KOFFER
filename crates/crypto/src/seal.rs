@@ -7,13 +7,14 @@
 //! bytes; the `COSE_Encrypt` framing is applied by the consumer, so this crate stays
 //! independent of `koffer-proto`.
 
+use zeroize::Zeroize;
+
 use crate::{
     aead::{self, Aead},
     error::{AeadError, KdfError, KemError},
     kdf::Kdf,
     kem::{Ciphertext, DecapsulationKey, EncapsulationKey, Kem, SharedSecret},
 };
-use zeroize::Zeroize;
 
 /// Domain-separation label bound into the key/nonce derivation.
 const LABEL: &[u8] = b"koffer-seal-v1";
@@ -126,14 +127,17 @@ pub fn unseal<K: Kem, D: Kdf, A: Aead>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::aead::Aes256Gcm;
-    use crate::hybrid::{X25519MlKem768, X25519MlKem1024};
-    use crate::kat::{assert_field, parse};
-    use crate::kdf::Hkdf;
-    use crate::mlkem::MlKem;
     use koffer_testutil::TestRng;
     use sha2::{Sha256, Sha384};
+
+    use super::*;
+    use crate::{
+        aead::Aes256Gcm,
+        hybrid::{X25519MlKem768, X25519MlKem1024},
+        kat::{assert_field, parse},
+        kdf::Hkdf,
+        mlkem::MlKem,
+    };
 
     /// Fixed entropy for keygen (>= 64 bytes for ML-KEM, >= 96 for hybrid).
     const ENTROPY: [u8; 96] = [0x07; 96];

@@ -1,7 +1,8 @@
 //! CBOR-serializable bounded byte buffers for the wire.
 
-use base::bytes::{Bytes, BytesError};
 use core::ops::Deref;
+
+use base::bytes::{Bytes, BytesError};
 use minicbor::encode::Write;
 
 /// A wire byte string of at most `MAX` bytes.
@@ -71,8 +72,7 @@ impl<'b, C, const MAX: usize> minicbor::Decode<'b, C> for CborBytes<MAX> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::codec;
-    use crate::testutil::BYTE_STRING;
+    use crate::{codec, testutil::BYTE_STRING};
 
     #[test]
     fn decodes_byte_string_without_alloc() {
@@ -115,9 +115,10 @@ mod tests {
 
 #[cfg(all(test, feature = "alloc"))]
 mod proptests {
+    use proptest::prelude::*;
+
     use super::*;
     use crate::codec;
-    use proptest::prelude::*;
 
     proptest! {
         #[test]

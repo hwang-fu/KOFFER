@@ -106,10 +106,11 @@ impl_backend!(ml_kem::MlKem1024);
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::kat::parse;
     use koffer_testutil::TestRng;
     use proptest::prelude::*;
+
+    use super::*;
+    use crate::kat::parse;
 
     // The backend impls are concrete per parameter set (private `KemParams`), so a generic
     // test helper cannot call `keygen`; generate the tests per parameter set instead.

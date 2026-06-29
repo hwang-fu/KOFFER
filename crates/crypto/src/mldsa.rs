@@ -79,10 +79,11 @@ impl<P: MlDsaParams> Verifier for MlDsa<P> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::kat::parse;
     use ml_dsa::{MlDsa65, MlDsa87};
     use proptest::prelude::*;
+
+    use super::*;
+    use crate::kat::parse;
 
     fn round_trip<P: MlDsaParams>(backend: &MlDsa<P>) {
         let (sk, vk) = backend.keygen(&[0x42u8; 32]).unwrap();

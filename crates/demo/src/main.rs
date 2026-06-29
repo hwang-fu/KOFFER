@@ -3,9 +3,10 @@
 //! is reproducible and pulls in no operating-system entropy source.
 
 use core::convert::Infallible;
+use std::process::ExitCode;
+
 use crypto::profile::CryptoProfile;
 use koffer_demo::run::{RunReport, run};
-use std::process::ExitCode;
 
 // Deterministic counter RNG. A demonstration does not need real entropy; a fixed seed keeps
 // the run reproducible. Kept local to the binary, not exposed in the library's public API.

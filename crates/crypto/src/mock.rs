@@ -2,11 +2,14 @@
 //! proving the trait seam composes end to end before any real scheme exists.
 //! The whole module is test-only.
 
-use crate::error::{KemError, SignError, VerifyError};
-use crate::kem::{Ciphertext, DecapsulationKey, EncapsulationKey, Kem, SharedSecret};
-use crate::profile::CryptoProfile;
-use crate::sign::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use koffer_testutil::TestRng;
+
+use crate::{
+    error::{KemError, SignError, VerifyError},
+    kem::{Ciphertext, DecapsulationKey, EncapsulationKey, Kem, SharedSecret},
+    profile::CryptoProfile,
+    sign::{Signature, Signer, SigningKey, Verifier, VerifyingKey},
+};
 
 /// A stand-in backend: no real cryptography, just enough for a roundtrip.
 struct Mock;

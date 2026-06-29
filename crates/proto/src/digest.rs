@@ -63,8 +63,7 @@ impl<'b, C, const N: usize> minicbor::Decode<'b, C> for Digest<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::codec;
-    use crate::testutil::BYTE_STRING;
+    use crate::{codec, testutil::BYTE_STRING};
 
     #[test]
     fn decodes_fixed_length_byte_string_without_alloc() {
@@ -108,9 +107,10 @@ mod tests {
 
 #[cfg(all(test, feature = "alloc"))]
 mod proptests {
+    use proptest::prelude::*;
+
     use super::*;
     use crate::codec;
-    use proptest::prelude::*;
 
     proptest! {
         #[test]

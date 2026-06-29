@@ -8,16 +8,20 @@
 //! the KEM level (which identifies the profile), so the unseal side derives it from the KEM
 //! codepoint. The KEM is the hybrid X25519 + ML-KEM; the AEAD is AES-256-GCM.
 
-use crypto::aead::{Aes256Gcm, Nonce, Tag};
-use crypto::alg::KemAlg;
-use crypto::hybrid::{X25519MlKem768, X25519MlKem1024};
-use crypto::kdf::Hkdf;
-use crypto::kem::{Ciphertext, DecapsulationKey, EncapsulationKey};
-use crypto::profile::CryptoProfile;
-use crypto::seal::{Sealed, seal, unseal};
-use proto::alg::AlgId;
-use proto::codec;
-use proto::cose::{CoseEncrypt, Recipient};
+use crypto::{
+    aead::{Aes256Gcm, Nonce, Tag},
+    alg::KemAlg,
+    hybrid::{X25519MlKem768, X25519MlKem1024},
+    kdf::Hkdf,
+    kem::{Ciphertext, DecapsulationKey, EncapsulationKey},
+    profile::CryptoProfile,
+    seal::{Sealed, seal, unseal},
+};
+use proto::{
+    alg::AlgId,
+    codec,
+    cose::{CoseEncrypt, Recipient},
+};
 use rand_core::CryptoRng;
 use sha2::{Sha256, Sha384};
 
@@ -168,8 +172,9 @@ fn unseal_from_codepoint(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use koffer_testutil::TestRng;
+
+    use super::*;
 
     #[test]
     fn seal_then_unseal_round_trips() {

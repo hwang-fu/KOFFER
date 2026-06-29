@@ -1,7 +1,9 @@
 use crypto::profile::CryptoProfile;
-use proto::alg::AlgId;
-use proto::ascii::AsciiStr;
-use proto::manifest::{Manifest, SuitDigest};
+use proto::{
+    alg::AlgId,
+    ascii::AsciiStr,
+    manifest::{Manifest, SuitDigest},
+};
 
 /// The observable outcome of one `run`: the encoded size of each artifact and whether each
 /// check passed. It lets a caller print a per-step trace without the flow itself doing any I/O.

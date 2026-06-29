@@ -6,15 +6,19 @@
 //! -- all per-scheme knowledge lives in the two dispatch helpers at the bottom, so the
 //! profile is the only switch. The general signer is ML-DSA.
 
-use crypto::alg::SigAlg;
-use crypto::mldsa::MlDsa;
-use crypto::profile::CryptoProfile;
-use crypto::sign::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
+use crypto::{
+    alg::SigAlg,
+    mldsa::MlDsa,
+    profile::CryptoProfile,
+    sign::{Signature, Signer, SigningKey, Verifier, VerifyingKey},
+};
 use ml_dsa::{MlDsa65, MlDsa87};
-use proto::alg::AlgId;
-use proto::codec;
-use proto::cose::{CoseSign1, Payload, SigStructure};
-use proto::manifest::Manifest;
+use proto::{
+    alg::AlgId,
+    codec,
+    cose::{CoseSign1, Payload, SigStructure},
+    manifest::Manifest,
+};
 
 /// Signs `manifest` under `profile`'s signature algorithm; returns the encoded
 /// `COSE_Sign1` and the verifying key needed to check it.
@@ -95,9 +99,9 @@ fn verifier_from_codepoint(alg_id: AlgId) -> Box<dyn Verifier> {
 
 #[cfg(test)]
 mod tests {
+    use proto::{ascii::AsciiStr, manifest::SuitDigest};
+
     use super::*;
-    use proto::ascii::AsciiStr;
-    use proto::manifest::SuitDigest;
 
     #[test]
     fn sign_then_verify_round_trips() {

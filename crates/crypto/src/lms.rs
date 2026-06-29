@@ -124,9 +124,10 @@ fn seed_from_entropy<H: HashChain>(entropy: &[u8]) -> Result<Seed<H>, SignError>
 
 #[cfg(test)]
 mod tests {
+    use proptest::prelude::*;
+
     use super::*;
     use crate::kat::parse;
-    use proptest::prelude::*;
 
     const TC1: &str = include_str!("../../../kat/lms/rfc8554-tc1.kat");
     const TC2: &str = include_str!("../../../kat/lms/rfc8554-tc2.kat");

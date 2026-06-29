@@ -4,9 +4,11 @@
 use crypto::profile::CryptoProfile;
 use koffer_demo::{run, seal, sign};
 use koffer_testutil::TestRng;
-use proto::alg::AlgId;
-use proto::ascii::AsciiStr;
-use proto::manifest::{Manifest, SuitDigest};
+use proto::{
+    alg::AlgId,
+    ascii::AsciiStr,
+    manifest::{Manifest, SuitDigest},
+};
 
 #[test]
 fn full_flow_runs_in_both_profiles() {

@@ -1,8 +1,11 @@
 //! Length-bounded byte buffers.
 
-use core::fmt;
-use core::hash::{Hash, Hasher};
-use core::ops::Deref;
+use core::{
+    fmt,
+    hash::{Hash, Hasher},
+    ops::Deref,
+};
+
 use subtle::ConstantTimeEq;
 use zeroize::Zeroize;
 

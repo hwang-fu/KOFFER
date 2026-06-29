@@ -291,8 +291,9 @@ mod tests {
 
 #[cfg(all(test, feature = "alloc"))]
 mod proptests {
-    use super::*;
     use proptest::prelude::*;
+
+    use super::*;
 
     const CAP: usize = 128;
     const MAX_BODY: usize = CAP - LEN_PREFIX;

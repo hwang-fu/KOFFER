@@ -11,10 +11,12 @@ use ml_kem::{MlKem768, MlKem1024};
 use sha2::{Sha256, Sha384};
 use zeroize::Zeroize;
 
-use crate::error::KemError;
-use crate::kdf::{Hkdf, Kdf};
-use crate::kem::{Ciphertext, DecapsulationKey, EncapsulationKey, Kem, SharedSecret};
-use crate::mlkem::MlKem;
+use crate::{
+    error::KemError,
+    kdf::{Hkdf, Kdf},
+    kem::{Ciphertext, DecapsulationKey, EncapsulationKey, Kem, SharedSecret},
+    mlkem::MlKem,
+};
 
 // Domain-separation labels, one per variant, so a combined secret is bound to its
 // algorithm and cannot be confused with any other HKDF output.
@@ -195,12 +197,15 @@ impl_backend!(X25519MlKem1024, MlKem1024, Sha384, LABEL_1024);
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::kat::{assert_field, parse};
-    use crate::kdf::Hkdf;
     use koffer_testutil::TestRng;
     use proptest::prelude::*;
     use sha2::Sha256;
+
+    use super::*;
+    use crate::{
+        kat::{assert_field, parse},
+        kdf::Hkdf,
+    };
 
     const SS_MLKEM: [u8; 32] = [0x01; 32];
     const SS_X25519: [u8; 32] = [0x02; 32];

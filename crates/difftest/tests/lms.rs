@@ -6,8 +6,10 @@
 //! harness catches a disagreeing reference. Showcase profile only -- hash-sigs implements
 //! full SHA-256, not the SHA-256/192 set our CNSA20 profile uses.
 
-use crypto::lms::{Lms, showcase_params};
-use crypto::sign::{SigningKey, StatefulSigner, VerifyingKey};
+use crypto::{
+    lms::{Lms, showcase_params},
+    sign::{SigningKey, StatefulSigner, VerifyingKey},
+};
 use hbs_lms::Sha256_256;
 use koffer_difftest::{HashSigs, LmsReference, Mismatch, differential_lms_verify, kat};
 use proptest::prelude::*;

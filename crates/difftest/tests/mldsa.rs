@@ -5,8 +5,10 @@
 //! randomized valid and tampered signatures, and a meta-test proving the harness
 //! actually catches a disagreeing reference.
 
-use crypto::mldsa::MlDsa;
-use crypto::sign::{Signer, SigningKey, VerifyingKey};
+use crypto::{
+    mldsa::MlDsa,
+    sign::{Signer, SigningKey, VerifyingKey},
+};
 use koffer_difftest::{Mismatch, MlDsaReference, MlDsaSet, OqsMlDsa, differential_verify, kat};
 use ml_dsa::MlDsa65;
 use proptest::prelude::*;

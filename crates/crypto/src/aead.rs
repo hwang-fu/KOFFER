@@ -11,8 +11,7 @@
 //! primitive never generates one, which keeps responsibility for using a fresh
 //! nonce per key with the composition that owns the key.
 
-use aes_gcm::aead::generic_array::GenericArray;
-use aes_gcm::{AeadInPlace, Aes256Gcm as GcmCipher, KeyInit};
+use aes_gcm::{AeadInPlace, Aes256Gcm as GcmCipher, KeyInit, aead::generic_array::GenericArray};
 // `AeadInPlace`, `KeyInit`, and `GenericArray` above come from the `aead` crate that both
 // RustCrypto AEADs re-export, so the ChaCha20-Poly1305 cipher reuses them; only the type differs.
 use chacha20poly1305::ChaCha20Poly1305 as ChaChaCipher;
@@ -181,9 +180,10 @@ impl Aead for ChaCha20Poly1305 {
 
 #[cfg(test)]
 mod tests {
+    use proptest::prelude::*;
+
     use super::*;
     use crate::kat::{assert_field, parse};
-    use proptest::prelude::*;
 
     const CAVP_AES_256_GCM: &str = include_str!("../../../kat/aead/cavp-aes-256-gcm.kat");
     const RFC8439_CHACHA20_POLY1305: &str =

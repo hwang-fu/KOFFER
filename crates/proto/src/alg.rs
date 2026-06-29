@@ -87,9 +87,10 @@ mod tests {
 
 #[cfg(all(test, feature = "alloc"))]
 mod proptests {
+    use proptest::prelude::*;
+
     use super::*;
     use crate::codec;
-    use proptest::prelude::*;
 
     proptest! {
         #[test]

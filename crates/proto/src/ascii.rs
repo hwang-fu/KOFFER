@@ -4,13 +4,11 @@
 //! (0x20-0x7E). Bytes outside that range are rejected at the parse boundary, never silently
 //! transcoded.
 
-use minicbor::encode::Write;
-
-use core::fmt;
-use core::ops::Deref;
-
 #[cfg(feature = "alloc")]
 use alloc::string::String;
+use core::{fmt, ops::Deref};
+
+use minicbor::encode::Write;
 
 /// Error returned when input contains a byte outside printable 7-bit US-ASCII (0x20-0x7E).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -194,8 +192,7 @@ impl<'b, C> minicbor::Decode<'b, C> for AsciiString {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::codec;
-    use crate::testutil::TEXT_STRING;
+    use crate::{codec, testutil::TEXT_STRING};
 
     #[test]
     fn accepts_every_printable_byte() {
@@ -348,9 +345,10 @@ mod tests {
 
 #[cfg(all(test, feature = "alloc"))]
 mod proptests {
+    use proptest::prelude::*;
+
     use super::*;
     use crate::codec;
-    use proptest::prelude::*;
 
     // Upper bound on the length of generated inputs.
     const MAX_LEN: usize = 64;

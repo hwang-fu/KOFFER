@@ -5,7 +5,11 @@
 //! actual signing, verifying, and encryption live in the crypto layer, wired by a
 //! consumer.
 
-use minicbor::{Encode, data::Type, encode::Write, encode::write::Cursor};
+use minicbor::{
+    Encode,
+    data::Type,
+    encode::{Write, write::Cursor},
+};
 
 use crate::{
     alg::AlgId,
@@ -468,8 +472,7 @@ impl<'b, C> minicbor::Decode<'b, C> for CoseEncrypt<'b> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::codec;
-    use crate::testutil::BYTE_STRING;
+    use crate::{codec, testutil::BYTE_STRING};
 
     #[test]
     fn decodes_protected_header_without_alloc() {
@@ -721,9 +724,10 @@ mod tests {
 
 #[cfg(all(test, feature = "alloc"))]
 mod proptests {
+    use proptest::prelude::*;
+
     use super::*;
     use crate::codec;
-    use proptest::prelude::*;
 
     const MAX_LEN: usize = 64;
 

@@ -16,10 +16,11 @@
 
 use core::convert::Infallible;
 
-use dudect_bencher::rand::RngExt;
-use dudect_bencher::{BenchRng, Class, CtRunner, ctbench_main};
-use koffer_crypto::kem::{Ciphertext, Kem};
-use koffer_crypto::mlkem::MlKem;
+use dudect_bencher::{BenchRng, Class, CtRunner, ctbench_main, rand::RngExt};
+use koffer_crypto::{
+    kem::{Ciphertext, Kem},
+    mlkem::MlKem,
+};
 use ml_kem::MlKem768;
 
 // Measurements built per harness run. dudect accumulates statistics across runs; tune this
