@@ -569,7 +569,9 @@ mod tests {
     #[test]
     fn request_attest_round_trips() {
         let challenge = [0x99u8; 16];
-        round_trip_request(Request::Attest { challenge: &challenge });
+        round_trip_request(Request::Attest {
+            challenge: &challenge,
+        });
     }
 
     #[cfg(feature = "alloc")]
@@ -752,7 +754,12 @@ mod tests {
             "83058443a10103a10542aabb42cdce818344a101382fa042eeffa50101020103636b6f6604822f42abcd0500",
         );
         let challenge = [0x99, 0x88];
-        check_request_kat(Request::Attest { challenge: &challenge }, "8206429988");
+        check_request_kat(
+            Request::Attest {
+                challenge: &challenge,
+            },
+            "8206429988",
+        );
         let hp = [0x01, 0x02];
         check_request_kat(Request::Handshake { payload: &hp }, "8201420102");
     }
