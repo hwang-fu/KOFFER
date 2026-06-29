@@ -11,6 +11,7 @@ use minicbor::{Encode, encode::Write};
 use crate::{
     alg::AlgId,
     ascii::AsciiStr,
+    codec::definite_array,
     cose::{CoseEncrypt, CoseSign1},
     error::ErrorCode,
     manifest::{Manifest, SuitDigest},
@@ -157,9 +158,7 @@ impl<C> minicbor::Encode<C> for Request<'_> {
 
 impl<'b, C> minicbor::Decode<'b, C> for Request<'b> {
     fn decode(d: &mut minicbor::Decoder<'b>, _: &mut C) -> Result<Self, minicbor::decode::Error> {
-        let len = d
-            .array()?
-            .ok_or_else(|| minicbor::decode::Error::message("request must be a definite array"))?;
+        let len = definite_array(d, "request must be a definite array")?;
         let tag = RequestTag::try_from(d.u8()?)
             .map_err(|_| minicbor::decode::Error::message("unknown request tag"))?;
         match tag {
@@ -314,9 +313,7 @@ impl<C> minicbor::Encode<C> for Response<'_> {
 
 impl<'b, C> minicbor::Decode<'b, C> for Response<'b> {
     fn decode(d: &mut minicbor::Decoder<'b>, _: &mut C) -> Result<Self, minicbor::decode::Error> {
-        let len = d
-            .array()?
-            .ok_or_else(|| minicbor::decode::Error::message("response must be a definite array"))?;
+        let len = definite_array(d, "response must be a definite array")?;
         let tag = ResponseTag::try_from(d.u8()?)
             .map_err(|_| minicbor::decode::Error::message("unknown response tag"))?;
         match tag {
@@ -406,9 +403,7 @@ where
 
 /// Decodes a definite CBOR array of algorithm identifiers, rejecting overflow past `MAX_ALGS`.
 fn decode_alg_list(d: &mut minicbor::Decoder<'_>) -> Result<AlgList, minicbor::decode::Error> {
-    let len = d.array()?.ok_or_else(|| {
-        minicbor::decode::Error::message("algorithm list must be a definite array")
-    })?;
+    let len = definite_array(d, "algorithm list must be a definite array")?;
     let mut list = AlgList::new();
     for _ in 0..len {
         let alg: AlgId = d.decode()?;

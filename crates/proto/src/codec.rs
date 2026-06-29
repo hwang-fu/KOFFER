@@ -61,6 +61,18 @@ pub(crate) fn definite_map(
         .ok_or_else(|| minicbor::decode::Error::message(message))
 }
 
+/// Reads a definite-length CBOR array header, returning its element count.
+///
+/// The array counterpart of `definite_map`, for decoders that loop over a variable
+/// number of elements. Rejects the indefinite-length form.
+pub(crate) fn definite_array(
+    d: &mut minicbor::Decoder<'_>,
+    message: &'static str,
+) -> Result<u64, minicbor::decode::Error> {
+    d.array()?
+        .ok_or_else(|| minicbor::decode::Error::message(message))
+}
+
 #[cfg(all(test, feature = "alloc"))]
 mod tests {
     use super::{decode, encode};
