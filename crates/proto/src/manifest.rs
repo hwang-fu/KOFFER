@@ -17,7 +17,7 @@ use crate::{alg::AlgId, ascii::AsciiStr};
 /// on-wire label integer.
 #[repr(u8)]
 enum Label {
-    Version = 1,
+    ProfileVersion = 1,
     Sequence = 2,
     ClassId = 3,
     PayloadDigest = 4,
@@ -32,7 +32,7 @@ impl TryFrom<u8> for Label {
 
     fn try_from(label: u8) -> Result<Self, ()> {
         Ok(match label {
-            1 => Label::Version,
+            1 => Label::ProfileVersion,
             2 => Label::Sequence,
             3 => Label::ClassId,
             4 => Label::PayloadDigest,
@@ -130,13 +130,13 @@ impl<'b> Encrypted<'b> {
 /// A SUIT-aligned update manifest (KOFFER local profile).
 ///
 /// A CBOR map binding the payload by digest plus update metadata. Required:
-/// `version`, `sequence` (anti-rollback), `class_id` (device-class compatibility),
+/// `profile_version`, `sequence` (anti-rollback), `class_id` (device-class compatibility),
 /// `payload_digest` (the image binding), `target_slot`. Optional: `version_string`,
 /// and -- for encrypted updates -- the `encrypted` pair (the encrypted payload's
 /// digest plus its key reference). Borrowed from the input, like the COSE types.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Manifest<'b> {
-    version: u8,
+    profile_version: u8,
     sequence: u64,
     class_id: AsciiStr<'b>,
     payload_digest: SuitDigest<'b>,
@@ -149,14 +149,14 @@ impl<'b> Manifest<'b> {
     /// Creates a manifest with the required fields; the optional fields start absent
     /// (set them with `with_version_string` / `with_encrypted`).
     pub fn new(
-        version: u8,
+        profile_version: u8,
         sequence: u64,
         class_id: AsciiStr<'b>,
         payload_digest: SuitDigest<'b>,
         target_slot: u8,
     ) -> Self {
         Self {
-            version,
+            profile_version,
             sequence,
             class_id,
             payload_digest,
@@ -180,8 +180,8 @@ impl<'b> Manifest<'b> {
     }
 
     /// The manifest profile version.
-    pub fn version(&self) -> u8 {
-        self.version
+    pub fn profile_version(&self) -> u8 {
+        self.profile_version
     }
 
     /// The anti-rollback sequence number.
@@ -239,7 +239,8 @@ impl<C> minicbor::Encode<C> for Manifest<'_> {
             5 + self.version_string.is_some() as u64 + 2 * self.encrypted.is_some() as u64;
         e.map(entries)?;
         // ascending label order (canonical, so the signed bytes are stable).
-        e.u8(Label::Version as u8)?.u8(self.version)?;
+        e.u8(Label::ProfileVersion as u8)?
+            .u8(self.profile_version)?;
         e.u8(Label::Sequence as u8)?.u64(self.sequence)?;
         e.u8(Label::ClassId as u8)?;
         self.class_id.encode(e, ctx)?;
@@ -265,7 +266,7 @@ impl<'b, C> minicbor::Decode<'b, C> for Manifest<'b> {
         let entries = d
             .map()?
             .ok_or_else(|| minicbor::decode::Error::message("manifest must be a definite map"))?;
-        let mut version = None;
+        let mut profile_version = None;
         let mut sequence = None;
         let mut class_id = None;
         let mut payload_digest = None;
@@ -288,7 +289,7 @@ impl<'b, C> minicbor::Decode<'b, C> for Manifest<'b> {
             let label = Label::try_from(label)
                 .map_err(|_| minicbor::decode::Error::message("unknown manifest label"))?;
             match label {
-                Label::Version => version = Some(d.u8()?),
+                Label::ProfileVersion => profile_version = Some(d.u8()?),
                 Label::Sequence => sequence = Some(d.u64()?),
                 Label::ClassId => class_id = Some(d.decode()?),
                 Label::PayloadDigest => payload_digest = Some(d.decode()?),
@@ -309,8 +310,9 @@ impl<'b, C> minicbor::Decode<'b, C> for Manifest<'b> {
             }
         };
         Ok(Self {
-            version: version
-                .ok_or_else(|| minicbor::decode::Error::message("manifest missing version"))?,
+            profile_version: profile_version.ok_or_else(|| {
+                minicbor::decode::Error::message("manifest missing profile_version")
+            })?,
             sequence: sequence
                 .ok_or_else(|| minicbor::decode::Error::message("manifest missing sequence"))?,
             class_id: class_id
@@ -343,7 +345,7 @@ mod tests {
             0x05, 0x00, // target_slot = 0
         ];
         let m: Manifest = codec::decode(&wire).expect("decode");
-        assert_eq!(m.version(), 1);
+        assert_eq!(m.profile_version(), 1);
         assert_eq!(m.sequence(), 5);
         assert_eq!(m.class_id().as_str(), "kof");
         assert_eq!(m.payload_digest().alg(), AlgId::new(-16));
@@ -549,7 +551,7 @@ mod proptests {
     proptest! {
         #[test]
         fn manifest_round_trips(
-            version in any::<u8>(),
+            profile_version in any::<u8>(),
             sequence in any::<u64>(),
             class_id in proptest::collection::vec(0x20u8..=0x7E, 1..=16),
             digest_alg in any::<i64>(),
@@ -569,7 +571,7 @@ mod proptests {
 
             let payload_digest = SuitDigest::new(AlgId::new(digest_alg), &digest_bytes);
             let mut manifest = Manifest::new(
-                version,
+                profile_version,
                 sequence,
                 AsciiStr::try_from(class_id.as_str()).unwrap(),
                 payload_digest,
