@@ -236,7 +236,7 @@ pub enum Response<'b> {
     /// The outcome of an encrypted-image install (the `InstallEncryptedImage` reply).
     BootDecision {
         /// Whether the image was accepted and booted.
-        accepted: bool,
+        image_is_accepted: bool,
         /// A measurement of the installed image.
         measurement: &'b [u8],
     },
@@ -291,11 +291,11 @@ impl<C> minicbor::Encode<C> for Response<'_> {
                 sig.encode(e, ctx)?;
             }
             Response::BootDecision {
-                accepted,
+                image_is_accepted,
                 measurement,
             } => {
                 e.array(3)?.u8(ResponseTag::BootDecision as u8)?;
-                e.bool(*accepted)?;
+                e.bool(*image_is_accepted)?;
                 e.bytes(measurement)?;
             }
             Response::Attestation(att) => {
@@ -355,10 +355,10 @@ impl<'b, C> minicbor::Decode<'b, C> for Response<'b> {
             }
             ResponseTag::BootDecision => {
                 expect_len(len, 3)?;
-                let accepted = d.bool()?;
+                let image_is_accepted = d.bool()?;
                 let measurement = d.bytes()?;
                 Ok(Response::BootDecision {
-                    accepted,
+                    image_is_accepted,
                     measurement,
                 })
             }
@@ -632,7 +632,7 @@ mod tests {
     fn response_boot_decision_round_trips() {
         let measurement = [0x77u8; 32];
         round_trip_response(Response::BootDecision {
-            accepted: true,
+            image_is_accepted: true,
             measurement: &measurement,
         });
     }
@@ -799,7 +799,7 @@ mod tests {
         let meas = [0x77, 0x88];
         check_response_kat(
             Response::BootDecision {
-                accepted: true,
+                image_is_accepted: true,
                 measurement: &meas,
             },
             "8304f5427788",
