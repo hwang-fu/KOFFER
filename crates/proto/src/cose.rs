@@ -5,12 +5,9 @@
 //! actual signing, verifying, and encryption live in the crypto layer, wired by a
 //! consumer.
 
-use minicbor::data::Type;
-use minicbor::encode::write::Cursor;
+use minicbor::{Encode, data::Type, encode::Write, encode::write::Cursor};
 
-use crate::alg::AlgId;
-use crate::ascii::AsciiStr;
-use crate::codec::{Decode, DecodeError, Decoder, Encode, EncodeError, Encoder, Write};
+use crate::{alg::AlgId, ascii::AsciiStr};
 
 /// COSE header label for the algorithm identifier (RFC 9052 Table 2).
 const LABEL_ALG: u8 = 1;
@@ -226,52 +223,66 @@ impl<'b> CoseEncrypt<'b> {
     }
 }
 
-impl<C> Encode<C> for ProtectedHeader {
-    fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), EncodeError<W::Error>> {
+impl<C> minicbor::Encode<C> for ProtectedHeader {
+    fn encode<W>(
+        &self,
+        e: &mut minicbor::Encoder<W>,
+        _: &mut C,
+    ) -> Result<(), minicbor::encode::Error<W::Error>>
+    where
+        W: Write,
+    {
         // The protected header is `bstr .cbor {1: alg}`: build the canonical map in a
         // bounded stack buffer (it cannot exceed PROTECTED_MAX), then emit it as a
         // byte string.
         let mut map = Cursor::new([0u8; PROTECTED_MAX]);
-        Encoder::new(&mut map)
+        minicbor::Encoder::new(&mut map)
             .map(1)
             .and_then(|m| m.u8(LABEL_ALG))
             .and_then(|m| m.i64(self.alg.get()))
-            .map_err(|_| EncodeError::message("protected header exceeds PROTECTED_MAX"))?;
+            .map_err(|_| {
+                minicbor::encode::Error::message("protected header exceeds PROTECTED_MAX")
+            })?;
         let n = map.position();
         e.bytes(&map.get_ref()[..n])?.ok()
     }
 }
 
-impl<'b, C> Decode<'b, C> for ProtectedHeader {
-    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, DecodeError> {
+impl<'b, C> minicbor::Decode<'b, C> for ProtectedHeader {
+    fn decode(d: &mut minicbor::Decoder<'b>, _: &mut C) -> Result<Self, minicbor::decode::Error> {
         // Read the wrapping byte string, then decode the canonical {1: alg} map from
         // it, rejecting anything that is not exactly that single-entry map.
         let protected = d.bytes()?;
-        let mut inner = Decoder::new(protected);
+        let mut inner = minicbor::Decoder::new(protected);
         if inner.map()? != Some(1) {
-            return Err(DecodeError::message(
+            return Err(minicbor::decode::Error::message(
                 "protected header must be a definite single-entry map",
             ));
         }
         if inner.u8()? != LABEL_ALG {
-            return Err(DecodeError::message(
+            return Err(minicbor::decode::Error::message(
                 "protected header missing algorithm label",
             ));
         }
         let alg = AlgId::new(inner.i64()?);
         if inner.position() != protected.len() {
-            return Err(DecodeError::message("protected header has trailing bytes"));
+            return Err(minicbor::decode::Error::message(
+                "protected header has trailing bytes",
+            ));
         }
         Ok(Self::new(alg))
     }
 }
 
-impl<C> Encode<C> for CoseSign1<'_> {
-    fn encode<W: Write>(
+impl<C> minicbor::Encode<C> for CoseSign1<'_> {
+    fn encode<W>(
         &self,
-        e: &mut Encoder<W>,
+        e: &mut minicbor::Encoder<W>,
         ctx: &mut C,
-    ) -> Result<(), EncodeError<W::Error>> {
+    ) -> Result<(), minicbor::encode::Error<W::Error>>
+    where
+        W: Write,
+    {
         e.array(4)?;
         self.protected.encode(e, ctx)?;
         match self.kid {
@@ -295,22 +306,30 @@ impl<C> Encode<C> for CoseSign1<'_> {
     }
 }
 
-impl<'b, C> Decode<'b, C> for CoseSign1<'b> {
-    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, DecodeError> {
+impl<'b, C> minicbor::Decode<'b, C> for CoseSign1<'b> {
+    fn decode(d: &mut minicbor::Decoder<'b>, _: &mut C) -> Result<Self, minicbor::decode::Error> {
         if d.array()? != Some(4) {
-            return Err(DecodeError::message("COSE_Sign1 must be a 4-element array"));
+            return Err(minicbor::decode::Error::message(
+                "COSE_Sign1 must be a 4-element array",
+            ));
         }
         let protected: ProtectedHeader = d.decode()?;
         let kid = match d.map()? {
             Some(0) => None,
             Some(1) => {
                 if d.u8()? != LABEL_KID {
-                    return Err(DecodeError::message("unexpected unprotected header label"));
+                    return Err(minicbor::decode::Error::message(
+                        "unexpected unprotected header label",
+                    ));
                 }
                 let kid: AsciiStr = d.decode()?; // F15-validated on decode
                 Some(kid)
             }
-            _ => return Err(DecodeError::message("unexpected unprotected header")),
+            _ => {
+                return Err(minicbor::decode::Error::message(
+                    "unexpected unprotected header",
+                ));
+            }
         };
         let payload = if d.datatype()? == Type::Null {
             d.null()?;
@@ -328,12 +347,15 @@ impl<'b, C> Decode<'b, C> for CoseSign1<'b> {
     }
 }
 
-impl<C> Encode<C> for SigStructure<'_> {
-    fn encode<W: Write>(
+impl<C> minicbor::Encode<C> for SigStructure<'_> {
+    fn encode<W>(
         &self,
-        e: &mut Encoder<W>,
+        e: &mut minicbor::Encoder<W>,
         ctx: &mut C,
-    ) -> Result<(), EncodeError<W::Error>> {
+    ) -> Result<(), minicbor::encode::Error<W::Error>>
+    where
+        W: Write,
+    {
         e.array(4)?;
         e.str(CONTEXT_SIGNATURE1)?;
         // body_protected: the same bstr-wrapped map as the message's protected slot.
@@ -343,12 +365,15 @@ impl<C> Encode<C> for SigStructure<'_> {
     }
 }
 
-impl<C> Encode<C> for Recipient<'_> {
-    fn encode<W: Write>(
+impl<C> minicbor::Encode<C> for Recipient<'_> {
+    fn encode<W>(
         &self,
-        e: &mut Encoder<W>,
+        e: &mut minicbor::Encoder<W>,
         ctx: &mut C,
-    ) -> Result<(), EncodeError<W::Error>> {
+    ) -> Result<(), minicbor::encode::Error<W::Error>>
+    where
+        W: Write,
+    {
         e.array(3)?;
         self.protected.encode(e, ctx)?;
         match self.kid {
@@ -364,10 +389,10 @@ impl<C> Encode<C> for Recipient<'_> {
     }
 }
 
-impl<'b, C> Decode<'b, C> for Recipient<'b> {
-    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, DecodeError> {
+impl<'b, C> minicbor::Decode<'b, C> for Recipient<'b> {
+    fn decode(d: &mut minicbor::Decoder<'b>, _: &mut C) -> Result<Self, minicbor::decode::Error> {
         if d.array()? != Some(3) {
-            return Err(DecodeError::message(
+            return Err(minicbor::decode::Error::message(
                 "COSE_recipient must be a 3-element array",
             ));
         }
@@ -376,12 +401,18 @@ impl<'b, C> Decode<'b, C> for Recipient<'b> {
             Some(0) => None,
             Some(1) => {
                 if d.u8()? != LABEL_KID {
-                    return Err(DecodeError::message("unexpected recipient header label"));
+                    return Err(minicbor::decode::Error::message(
+                        "unexpected recipient header label",
+                    ));
                 }
                 let kid: AsciiStr = d.decode()?;
                 Some(kid)
             }
-            _ => return Err(DecodeError::message("unexpected recipient header")),
+            _ => {
+                return Err(minicbor::decode::Error::message(
+                    "unexpected recipient header",
+                ));
+            }
         };
         let encapsulation = d.bytes()?;
         Ok(Self {
@@ -392,12 +423,15 @@ impl<'b, C> Decode<'b, C> for Recipient<'b> {
     }
 }
 
-impl<C> Encode<C> for CoseEncrypt<'_> {
-    fn encode<W: Write>(
+impl<C> minicbor::Encode<C> for CoseEncrypt<'_> {
+    fn encode<W>(
         &self,
-        e: &mut Encoder<W>,
+        e: &mut minicbor::Encoder<W>,
         ctx: &mut C,
-    ) -> Result<(), EncodeError<W::Error>> {
+    ) -> Result<(), minicbor::encode::Error<W::Error>>
+    where
+        W: Write,
+    {
         e.array(4)?;
         self.protected.encode(e, ctx)?;
         // unprotected header: {5: IV}.
@@ -412,28 +446,30 @@ impl<C> Encode<C> for CoseEncrypt<'_> {
     }
 }
 
-impl<'b, C> Decode<'b, C> for CoseEncrypt<'b> {
-    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, DecodeError> {
+impl<'b, C> minicbor::Decode<'b, C> for CoseEncrypt<'b> {
+    fn decode(d: &mut minicbor::Decoder<'b>, _: &mut C) -> Result<Self, minicbor::decode::Error> {
         if d.array()? != Some(4) {
-            return Err(DecodeError::message(
+            return Err(minicbor::decode::Error::message(
                 "COSE_Encrypt must be a 4-element array",
             ));
         }
         let protected: ProtectedHeader = d.decode()?;
         // unprotected header: exactly {5: IV}.
         if d.map()? != Some(1) {
-            return Err(DecodeError::message(
+            return Err(minicbor::decode::Error::message(
                 "COSE_Encrypt unprotected header must carry the IV",
             ));
         }
         if d.u8()? != LABEL_IV {
-            return Err(DecodeError::message("unexpected COSE_Encrypt header label"));
+            return Err(minicbor::decode::Error::message(
+                "unexpected COSE_Encrypt header label",
+            ));
         }
         let nonce = d.bytes()?;
         let ciphertext = d.bytes()?;
         // recipients: exactly one.
         if d.array()? != Some(1) {
-            return Err(DecodeError::message(
+            return Err(minicbor::decode::Error::message(
                 "COSE_Encrypt must have exactly one recipient",
             ));
         }
