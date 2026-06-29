@@ -21,3 +21,5 @@ fn ct_decap(runner: &mut CtRunner, _rng: &mut BenchRng) {
         runner.run_one(class, || core::hint::black_box(i));
     }
 }
+
+ctbench_main!(ct_decap);
