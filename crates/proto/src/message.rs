@@ -31,7 +31,7 @@ enum RequestTag {
 impl TryFrom<u8> for RequestTag {
     type Error = ();
 
-    fn try_from(tag: u8) -> Result<Self, Self::Error> {
+    fn try_from(tag: u8) -> Result<Self, ()> {
         Ok(match tag {
             1 => RequestTag::Handshake,
             2 => RequestTag::GetInfo,
@@ -44,13 +44,33 @@ impl TryFrom<u8> for RequestTag {
     }
 }
 
-// Response tags (device -> host).
-const RESP_INFO: u8 = 1;
-const RESP_PUBLIC_KEYS: u8 = 2;
-const RESP_COSE_SIGN1: u8 = 3;
-const RESP_BOOT_DECISION: u8 = 4;
-const RESP_ATTESTATION: u8 = 5;
-const RESP_ERROR: u8 = 6;
+/// Wire tag for each `Response` variant (device -> host): the leading integer of the
+/// message's CBOR array. The `#[repr(u8)]` discriminant is the on-wire byte value.
+#[repr(u8)]
+enum ResponseTag {
+    Info = 1,
+    PublicKeys = 2,
+    CoseSign1 = 3,
+    BootDecision = 4,
+    Attestation = 5,
+    Error = 6,
+}
+
+impl TryFrom<u8> for ResponseTag {
+    type Error = ();
+
+    fn try_from(tag: u8) -> Result<Self, ()> {
+        Ok(match tag {
+            1 => ResponseTag::Info,
+            2 => ResponseTag::PublicKeys,
+            3 => ResponseTag::CoseSign1,
+            4 => ResponseTag::BootDecision,
+            5 => ResponseTag::Attestation,
+            6 => ResponseTag::Error,
+            _ => return Err(()),
+        })
+    }
+}
 
 /// Maximum number of algorithm identifiers carried in an `Info` list.
 pub const MAX_ALGS: usize = 8;
@@ -259,7 +279,7 @@ impl<C> minicbor::Encode<C> for Response<'_> {
                 keys_present,
                 entropy_healthy,
             } => {
-                e.array(6)?.u8(RESP_INFO)?;
+                e.array(6)?.u8(ResponseTag::Info as u8)?;
                 fw.encode(e, ctx)?;
                 encode_alg_list(e, sig_algs, ctx)?;
                 encode_alg_list(e, kem_algs, ctx)?;
@@ -271,30 +291,30 @@ impl<C> minicbor::Encode<C> for Response<'_> {
                 kem_alg,
                 kem_public_key,
             } => {
-                e.array(5)?.u8(RESP_PUBLIC_KEYS)?;
+                e.array(5)?.u8(ResponseTag::PublicKeys as u8)?;
                 sig_alg.encode(e, ctx)?;
                 e.bytes(sig_public_key)?;
                 kem_alg.encode(e, ctx)?;
                 e.bytes(kem_public_key)?;
             }
             Response::CoseSign1(sig) => {
-                e.array(2)?.u8(RESP_COSE_SIGN1)?;
+                e.array(2)?.u8(ResponseTag::CoseSign1 as u8)?;
                 sig.encode(e, ctx)?;
             }
             Response::BootDecision {
                 accepted,
                 measurement,
             } => {
-                e.array(3)?.u8(RESP_BOOT_DECISION)?;
+                e.array(3)?.u8(ResponseTag::BootDecision as u8)?;
                 e.bool(*accepted)?;
                 e.bytes(measurement)?;
             }
             Response::Attestation(att) => {
-                e.array(2)?.u8(RESP_ATTESTATION)?;
+                e.array(2)?.u8(ResponseTag::Attestation as u8)?;
                 att.encode(e, ctx)?;
             }
             Response::Error { code, detail } => {
-                e.array(3)?.u8(RESP_ERROR)?;
+                e.array(3)?.u8(ResponseTag::Error as u8)?;
                 code.encode(e, ctx)?;
                 detail.encode(e, ctx)?;
             }
@@ -308,8 +328,10 @@ impl<'b, C> minicbor::Decode<'b, C> for Response<'b> {
         let len = d
             .array()?
             .ok_or_else(|| minicbor::decode::Error::message("response must be a definite array"))?;
-        match d.u8()? {
-            RESP_INFO => {
+        let tag = ResponseTag::try_from(d.u8()?)
+            .map_err(|_| minicbor::decode::Error::message("unknown response tag"))?;
+        match tag {
+            ResponseTag::Info => {
                 expect_len(len, 6)?;
                 let fw = d.decode()?;
                 let sig_algs = decode_alg_list(d)?;
@@ -324,7 +346,7 @@ impl<'b, C> minicbor::Decode<'b, C> for Response<'b> {
                     entropy_healthy,
                 })
             }
-            RESP_PUBLIC_KEYS => {
+            ResponseTag::PublicKeys => {
                 expect_len(len, 5)?;
                 let sig_alg = d.decode()?;
                 let sig_public_key = d.bytes()?;
@@ -337,12 +359,12 @@ impl<'b, C> minicbor::Decode<'b, C> for Response<'b> {
                     kem_public_key,
                 })
             }
-            RESP_COSE_SIGN1 => {
+            ResponseTag::CoseSign1 => {
                 expect_len(len, 2)?;
                 let sig = d.decode()?;
                 Ok(Response::CoseSign1(sig))
             }
-            RESP_BOOT_DECISION => {
+            ResponseTag::BootDecision => {
                 expect_len(len, 3)?;
                 let accepted = d.bool()?;
                 let measurement = d.bytes()?;
@@ -351,18 +373,17 @@ impl<'b, C> minicbor::Decode<'b, C> for Response<'b> {
                     measurement,
                 })
             }
-            RESP_ATTESTATION => {
+            ResponseTag::Attestation => {
                 expect_len(len, 2)?;
                 let att = d.decode()?;
                 Ok(Response::Attestation(att))
             }
-            RESP_ERROR => {
+            ResponseTag::Error => {
                 expect_len(len, 3)?;
                 let code = d.decode()?;
                 let detail = d.decode()?;
                 Ok(Response::Error { code, detail })
             }
-            _ => Err(minicbor::decode::Error::message("unknown response tag")),
         }
     }
 }
@@ -462,7 +483,7 @@ mod tests {
     #[test]
     fn rejects_non_ascii_error_detail() {
         let wire = [
-            0x83, RESP_ERROR, 0x01, // array(3), Error tag, code 1
+            0x83, ResponseTag::Error as u8, 0x01, // array(3), Error tag, code 1
             0x65, 0x63, 0x61, 0x66, 0xc3, 0xa9, // detail = "café"
         ];
         let r: Result<Response, _> = codec::decode(&wire);
@@ -638,7 +659,7 @@ mod tests {
     fn rejects_non_ascii_info_fw() {
         // Info with a non-ASCII fw string -> F15 reject.
         let wire = [
-            0x86, RESP_INFO, // array(6), Info tag
+            0x86, ResponseTag::Info as u8, // array(6), Info tag
             0x65, 0x63, 0x61, 0x66, 0xc3, 0xa9, // fw = "café"
         ];
         let r: Result<Response, _> = codec::decode(&wire);
