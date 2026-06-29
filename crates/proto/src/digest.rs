@@ -1,6 +1,6 @@
 //! Fixed-size cryptographic digests.
 
-use crate::codec::{Decode, DecodeError, Decoder, Encode, EncodeError, Encoder, Write};
+use minicbor::encode::Write;
 
 /// A fixed-size hash digest of `N` bytes.
 ///
@@ -38,17 +38,24 @@ impl<const N: usize> AsRef<[u8]> for Digest<N> {
     }
 }
 
-impl<C, const N: usize> Encode<C> for Digest<N> {
-    fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), EncodeError<W::Error>> {
+impl<C, const N: usize> minicbor::Encode<C> for Digest<N> {
+    fn encode<W>(
+        &self,
+        e: &mut minicbor::Encoder<W>,
+        _: &mut C,
+    ) -> Result<(), minicbor::encode::Error<W::Error>>
+    where
+        W: Write,
+    {
         e.bytes(&self.0)?.ok()
     }
 }
 
-impl<'b, C, const N: usize> Decode<'b, C> for Digest<N> {
-    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, DecodeError> {
+impl<'b, C, const N: usize> minicbor::Decode<'b, C> for Digest<N> {
+    fn decode(d: &mut minicbor::Decoder<'b>, _: &mut C) -> Result<Self, minicbor::decode::Error> {
         let bytes = d.bytes()?;
         let array = <[u8; N]>::try_from(bytes)
-            .map_err(|_| DecodeError::message("digest has wrong length"))?;
+            .map_err(|_| minicbor::decode::Error::message("digest has wrong length"))?;
         Ok(Self::new(array))
     }
 }
