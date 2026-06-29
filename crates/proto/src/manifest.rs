@@ -77,13 +77,40 @@ impl<'b, C> minicbor::Decode<'b, C> for SuitDigest<'b> {
     }
 }
 
+/// The encrypted-update fields, carried together or not at all: the digest of the
+/// encrypted payload plus the reference to the key info needed to decrypt it.
+///
+/// Bundling them in one type means a manifest cannot hold one without the other.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Encrypted<'b> {
+    digest: SuitDigest<'b>,
+    key_ref: AsciiStr<'b>,
+}
+
+impl<'b> Encrypted<'b> {
+    /// Creates the encrypted-update pair from the payload digest and key reference.
+    pub fn new(digest: SuitDigest<'b>, key_ref: AsciiStr<'b>) -> Self {
+        Self { digest, key_ref }
+    }
+
+    /// The digest of the encrypted payload.
+    pub fn digest(&self) -> SuitDigest<'b> {
+        self.digest
+    }
+
+    /// The reference to the key info needed to decrypt the payload.
+    pub fn key_ref(&self) -> AsciiStr<'b> {
+        self.key_ref
+    }
+}
+
 /// A SUIT-aligned update manifest (KOFFER local profile).
 ///
 /// A CBOR map binding the payload by digest plus update metadata. Required:
 /// `version`, `sequence` (anti-rollback), `class_id` (device-class compatibility),
 /// `payload_digest` (the image binding), `target_slot`. Optional: `version_string`,
-/// and -- for encrypted updates -- `encrypted_digest` + `key_ref`. Borrowed from the
-/// input, like the COSE types.
+/// and -- for encrypted updates -- the `encrypted` pair (the encrypted payload's
+/// digest plus its key reference). Borrowed from the input, like the COSE types.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Manifest<'b> {
     version: u8,
@@ -92,8 +119,7 @@ pub struct Manifest<'b> {
     payload_digest: SuitDigest<'b>,
     target_slot: u8,
     version_string: Option<AsciiStr<'b>>,
-    encrypted_digest: Option<SuitDigest<'b>>,
-    key_ref: Option<AsciiStr<'b>>,
+    encrypted: Option<Encrypted<'b>>,
 }
 
 impl<'b> Manifest<'b> {
@@ -113,8 +139,7 @@ impl<'b> Manifest<'b> {
             payload_digest,
             target_slot,
             version_string: None,
-            encrypted_digest: None,
-            key_ref: None,
+            encrypted: None,
         }
     }
 
@@ -127,8 +152,7 @@ impl<'b> Manifest<'b> {
     /// Sets the encrypted-update fields together: the encrypted payload's digest and
     /// the reference to its key info.
     pub fn with_encrypted(mut self, digest: SuitDigest<'b>, key_ref: AsciiStr<'b>) -> Self {
-        self.encrypted_digest = Some(digest);
-        self.key_ref = Some(key_ref);
+        self.encrypted = Some(Encrypted::new(digest, key_ref));
         self
     }
 
@@ -162,14 +186,9 @@ impl<'b> Manifest<'b> {
         self.version_string
     }
 
-    /// The optional encrypted-payload digest.
-    pub fn encrypted_digest(&self) -> Option<SuitDigest<'b>> {
-        self.encrypted_digest
-    }
-
-    /// The optional key-info reference.
-    pub fn key_ref(&self) -> Option<AsciiStr<'b>> {
-        self.key_ref
+    /// The optional encrypted-update fields (digest + key reference), present together.
+    pub fn encrypted(&self) -> Option<Encrypted<'b>> {
+        self.encrypted
     }
 
     /// Whether this manifest binds the given payload digest: whether the supplied
@@ -193,10 +212,8 @@ impl<C> minicbor::Encode<C> for Manifest<'_> {
     where
         W: Write,
     {
-        let entries = 5
-            + self.version_string.is_some() as u64
-            + self.encrypted_digest.is_some() as u64
-            + self.key_ref.is_some() as u64;
+        let entries =
+            5 + self.version_string.is_some() as u64 + 2 * self.encrypted.is_some() as u64;
         e.map(entries)?;
         // ascending label order (canonical, so the signed bytes are stable).
         e.u8(LABEL_VERSION)?.u8(self.version)?;
@@ -210,13 +227,11 @@ impl<C> minicbor::Encode<C> for Manifest<'_> {
             e.u8(LABEL_VERSION_STRING)?;
             version_string.encode(e, ctx)?;
         }
-        if let Some(encrypted_digest) = self.encrypted_digest {
+        if let Some(encrypted) = self.encrypted {
             e.u8(LABEL_ENCRYPTED_DIGEST)?;
-            encrypted_digest.encode(e, ctx)?;
-        }
-        if let Some(key_ref) = self.key_ref {
+            encrypted.digest.encode(e, ctx)?;
             e.u8(LABEL_KEY_REF)?;
-            key_ref.encode(e, ctx)?;
+            encrypted.key_ref.encode(e, ctx)?;
         }
         Ok(())
     }
@@ -260,11 +275,15 @@ impl<'b, C> minicbor::Decode<'b, C> for Manifest<'b> {
             }
         }
         // The encrypted-update fields are paired: both present or both absent.
-        if encrypted_digest.is_some() != key_ref.is_some() {
-            return Err(minicbor::decode::Error::message(
-                "encrypted_digest and key_ref must both be present or both absent",
-            ));
-        }
+        let encrypted = match (encrypted_digest, key_ref) {
+            (Some(digest), Some(key_ref)) => Some(Encrypted::new(digest, key_ref)),
+            (None, None) => None,
+            _ => {
+                return Err(minicbor::decode::Error::message(
+                    "encrypted_digest and key_ref must both be present or both absent",
+                ));
+            }
+        };
         Ok(Self {
             version: version
                 .ok_or_else(|| minicbor::decode::Error::message("manifest missing version"))?,
@@ -278,8 +297,7 @@ impl<'b, C> minicbor::Decode<'b, C> for Manifest<'b> {
             target_slot: target_slot
                 .ok_or_else(|| minicbor::decode::Error::message("manifest missing target_slot"))?,
             version_string,
-            encrypted_digest,
-            key_ref,
+            encrypted,
         })
     }
 }
@@ -308,8 +326,7 @@ mod tests {
         assert_eq!(m.payload_digest().bytes(), &[0xAB, 0xCD]);
         assert_eq!(m.target_slot(), 0);
         assert!(m.version_string().is_none());
-        assert!(m.encrypted_digest().is_none());
-        assert!(m.key_ref().is_none());
+        assert!(m.encrypted().is_none());
     }
 
     #[test]
