@@ -216,7 +216,7 @@ pub enum Response<'b> {
         /// Supported KEM algorithms.
         kem_algs: AlgList,
         /// Whether the device key pairs have been generated.
-        keys_present: bool,
+        keys_are_present: bool,
         /// Whether the entropy source is currently healthy.
         entropy_healthy: bool,
     },
@@ -265,14 +265,14 @@ impl<C> minicbor::Encode<C> for Response<'_> {
                 firmware_version,
                 sig_algs,
                 kem_algs,
-                keys_present,
+                keys_are_present,
                 entropy_healthy,
             } => {
                 e.array(6)?.u8(ResponseTag::Info as u8)?;
                 firmware_version.encode(e, ctx)?;
                 encode_alg_list(e, sig_algs, ctx)?;
                 encode_alg_list(e, kem_algs, ctx)?;
-                e.bool(*keys_present)?.bool(*entropy_healthy)?;
+                e.bool(*keys_are_present)?.bool(*entropy_healthy)?;
             }
             Response::PublicKeys {
                 sig_alg,
@@ -325,13 +325,13 @@ impl<'b, C> minicbor::Decode<'b, C> for Response<'b> {
                 let firmware_version = d.decode()?;
                 let sig_algs = decode_alg_list(d)?;
                 let kem_algs = decode_alg_list(d)?;
-                let keys_present = d.bool()?;
+                let keys_are_present = d.bool()?;
                 let entropy_healthy = d.bool()?;
                 Ok(Response::Info {
                     firmware_version,
                     sig_algs,
                     kem_algs,
-                    keys_present,
+                    keys_are_present,
                     entropy_healthy,
                 })
             }
@@ -585,7 +585,7 @@ mod tests {
             firmware_version,
             sig_algs,
             kem_algs,
-            keys_present: true,
+            keys_are_present: true,
             entropy_healthy: true,
         });
     }
@@ -770,7 +770,7 @@ mod tests {
                 firmware_version: AsciiStr::try_from("kof").unwrap(),
                 sig_algs,
                 kem_algs,
-                keys_present: true,
+                keys_are_present: true,
                 entropy_healthy: false,
             },
             "8601636b6f66812681382ff5f4",
@@ -837,7 +837,7 @@ mod proptests {
             fw in proptest::collection::vec(0x20u8..=0x7E, 0..=16),
             sig in proptest::collection::vec(any::<i64>(), 0..=MAX_ALGS),
             kem in proptest::collection::vec(any::<i64>(), 0..=MAX_ALGS),
-            keys_present in any::<bool>(),
+            keys_are_present in any::<bool>(),
             entropy_healthy in any::<bool>(),
         ) {
             let fw = String::from_utf8(fw).unwrap();
@@ -853,7 +853,7 @@ mod proptests {
                 firmware_version: AsciiStr::try_from(fw.as_str()).unwrap(),
                 sig_algs,
                 kem_algs,
-                keys_present,
+                keys_are_present,
                 entropy_healthy,
             };
             let encoded = codec::encode(&original).unwrap();
