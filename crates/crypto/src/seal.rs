@@ -132,7 +132,7 @@ mod tests {
     use crate::kat::{assert_field, parse};
     use crate::kdf::Hkdf;
     use crate::mlkem::MlKem;
-    use koffer_testutil::CounterRng;
+    use koffer_testutil::TestRng;
     use sha2::{Sha256, Sha384};
 
     /// Fixed entropy for keygen (>= 64 bytes for ML-KEM, >= 96 for hybrid).
@@ -148,7 +148,7 @@ mod tests {
     ) {
         let plaintext = [0xABu8; 40];
         let aad = b"koffer seal roundtrip";
-        let mut rng = CounterRng::new(0);
+        let mut rng = TestRng::new(0);
         let mut buffer = plaintext;
 
         let sealed = seal(kem, kdf, aead, ek, aad, &mut buffer, &mut rng).expect("seal");
@@ -198,7 +198,7 @@ mod tests {
 
         let plaintext = [0xABu8; 32];
         let aad = b"ctx";
-        let mut rng = CounterRng::new(0);
+        let mut rng = TestRng::new(0);
         let mut ciphertext = plaintext;
         let sealed = seal(&kem, &kdf, &aead, &ek, aad, &mut ciphertext, &mut rng).unwrap();
 
@@ -247,7 +247,7 @@ mod tests {
 
         let plaintext = [0xABu8; 32];
         let aad = b"ctx";
-        let mut rng = CounterRng::new(0);
+        let mut rng = TestRng::new(0);
         let mut buf = plaintext;
         let sealed = seal(&kem, &kdf, &aead, &ek, aad, &mut buf, &mut rng).unwrap();
 
@@ -277,7 +277,7 @@ mod tests {
                 let plaintext = record.field("plaintext").unwrap();
                 let aad = record.field("aad").unwrap();
                 let mut buffer = plaintext.to_vec();
-                let mut rng = CounterRng::new(0);
+                let mut rng = TestRng::new(0);
                 let sealed = seal(&kem, &kdf, &aead, &ek, aad, &mut buffer, &mut rng).unwrap();
                 assert_field(record, "kem_ciphertext", sealed.kem_ciphertext.as_slice());
                 assert_field(record, "nonce", sealed.nonce.as_slice());

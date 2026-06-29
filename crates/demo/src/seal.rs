@@ -169,7 +169,7 @@ fn unseal_from_codepoint(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use koffer_testutil::CounterRng;
+    use koffer_testutil::TestRng;
 
     #[test]
     fn seal_then_unseal_round_trips() {
@@ -177,7 +177,7 @@ mod tests {
             CryptoProfile::Showcase,
             b"payload",
             b"ctx",
-            &mut CounterRng::new(1),
+            &mut TestRng::new(1),
         );
         assert_eq!(
             unseal_payload(&cose, &dk, b"ctx").as_deref(),
@@ -191,7 +191,7 @@ mod tests {
             CryptoProfile::Showcase,
             b"payload",
             b"ctx",
-            &mut CounterRng::new(1),
+            &mut TestRng::new(1),
         );
         let mid = cose.len() / 2;
         cose[mid] ^= 0x01;

@@ -108,7 +108,7 @@ impl_backend!(ml_kem::MlKem1024);
 mod tests {
     use super::*;
     use crate::kat::parse;
-    use koffer_testutil::CounterRng;
+    use koffer_testutil::TestRng;
     use proptest::prelude::*;
 
     // The backend impls are concrete per parameter set (private `KemParams`), so a generic
@@ -119,7 +119,7 @@ mod tests {
             fn $round_trip() {
                 let backend = MlKem::<$param>::new();
                 let (ek, dk) = backend.keygen(&[0x42u8; 64]).unwrap();
-                let (ciphertext, sent) = backend.encapsulate(&ek, &mut CounterRng::new(1)).unwrap();
+                let (ciphertext, sent) = backend.encapsulate(&ek, &mut TestRng::new(1)).unwrap();
                 let recovered = backend.decapsulate(&dk, &ciphertext).unwrap();
                 assert_eq!(sent.as_slice(), recovered.as_slice());
             }
@@ -128,7 +128,7 @@ mod tests {
             fn $implicit_rejection() {
                 let backend = MlKem::<$param>::new();
                 let (ek, dk) = backend.keygen(&[0x42u8; 64]).unwrap();
-                let (ciphertext, sent) = backend.encapsulate(&ek, &mut CounterRng::new(1)).unwrap();
+                let (ciphertext, sent) = backend.encapsulate(&ek, &mut TestRng::new(1)).unwrap();
 
                 // Flip a byte well inside the ciphertext -- still the right length.
                 let mut bytes = ciphertext.as_slice().to_vec();
@@ -198,7 +198,7 @@ mod tests {
                 fn $name(rng_seed in any::<u64>()) {
                     let backend = MlKem::<$param>::new();
                     let (ek, dk) = backend.keygen(&[0x42u8; 64]).unwrap();
-                    let (ciphertext, sent) = backend.encapsulate(&ek, &mut CounterRng::new(rng_seed)).unwrap();
+                    let (ciphertext, sent) = backend.encapsulate(&ek, &mut TestRng::new(rng_seed)).unwrap();
                     let recovered = backend.decapsulate(&dk, &ciphertext).unwrap();
                     prop_assert_eq!(sent.as_slice(), recovered.as_slice());
                 }

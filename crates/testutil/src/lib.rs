@@ -13,9 +13,9 @@ use rand_core::{TryCryptoRng, TryRng};
 ///
 /// It is **not** cryptographically secure -- it simply returns an incrementing counter.
 /// Use it only to make test runs reproducible; never for real key material.
-pub struct CounterRng(u64);
+pub struct TestRng(u64);
 
-impl CounterRng {
+impl TestRng {
     /// Creates a counter RNG seeded at `seed`; successive draws return `seed + 1`,
     /// `seed + 2`, and so on.
     pub fn new(seed: u64) -> Self {
@@ -23,7 +23,7 @@ impl CounterRng {
     }
 }
 
-impl TryRng for CounterRng {
+impl TryRng for TestRng {
     type Error = Infallible;
 
     fn try_next_u32(&mut self) -> Result<u32, Infallible> {
@@ -44,4 +44,4 @@ impl TryRng for CounterRng {
     }
 }
 
-impl TryCryptoRng for CounterRng {}
+impl TryCryptoRng for TestRng {}

@@ -3,15 +3,15 @@
 
 use crypto::profile::CryptoProfile;
 use koffer_demo::{run, seal, sign};
-use koffer_testutil::CounterRng;
+use koffer_testutil::TestRng;
 use proto::alg::AlgId;
 use proto::ascii::AsciiStr;
 use proto::manifest::{Manifest, SuitDigest};
 
 #[test]
 fn full_flow_runs_in_both_profiles() {
-    assert!(run::run(CryptoProfile::Showcase, &mut CounterRng::new(1)).ok());
-    assert!(run::run(CryptoProfile::Cnsa20, &mut CounterRng::new(1)).ok());
+    assert!(run::run(CryptoProfile::Showcase, &mut TestRng::new(1)).ok());
+    assert!(run::run(CryptoProfile::Cnsa20, &mut TestRng::new(1)).ok());
 }
 
 #[test]
@@ -30,7 +30,7 @@ fn tampered_signature_and_container_are_rejected() {
         CryptoProfile::Cnsa20,
         b"payload",
         b"aad",
-        &mut CounterRng::new(2),
+        &mut TestRng::new(2),
     );
     let i = sealed.len() / 2;
     sealed[i] ^= 0x01;

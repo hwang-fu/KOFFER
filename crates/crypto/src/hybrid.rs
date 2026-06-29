@@ -198,7 +198,7 @@ mod tests {
     use super::*;
     use crate::kat::{assert_field, parse};
     use crate::kdf::Hkdf;
-    use koffer_testutil::CounterRng;
+    use koffer_testutil::TestRng;
     use proptest::prelude::*;
     use sha2::Sha256;
 
@@ -257,7 +257,7 @@ mod tests {
                 assert_field(record, "decapsulation_key", dk.as_slice());
 
                 // encapsulate (fixed RNG) reproduces the frozen ciphertext + secret.
-                let mut rng = CounterRng::new(0);
+                let mut rng = TestRng::new(0);
                 let (ct, ss) = backend.encapsulate(&ek, &mut rng).unwrap();
                 assert_field(record, "ciphertext", ct.as_slice());
                 assert_field(record, "shared_secret", ss.as_slice());
@@ -285,7 +285,7 @@ mod tests {
                 ) {
                     let backend = $backend;
                     let (ek, dk) = backend.keygen(&entropy).unwrap();
-                    let mut rng = CounterRng::new(seed);
+                    let mut rng = TestRng::new(seed);
                     let (ct, ss) = backend.encapsulate(&ek, &mut rng).unwrap();
                     let recovered = backend.decapsulate(&dk, &ct).unwrap();
                     prop_assert_eq!(ss.as_slice(), recovered.as_slice());
@@ -307,7 +307,7 @@ mod tests {
                 let backend = $backend;
                 let entropy = [0x07u8; 96];
                 let (ek, dk) = backend.keygen(&entropy).unwrap();
-                let mut rng = CounterRng::new(0);
+                let mut rng = TestRng::new(0);
                 let (ct, ss) = backend.encapsulate(&ek, &mut rng).unwrap();
 
                 // Baseline: the untouched ciphertext recovers the secret.
