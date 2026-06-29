@@ -24,7 +24,7 @@ enum Label {
     TargetSlot = 5,
     VersionString = 6,
     EncryptedDigest = 7,
-    KeyRef = 8,
+    KeyId = 8,
 }
 
 impl TryFrom<u8> for Label {
@@ -39,7 +39,7 @@ impl TryFrom<u8> for Label {
             5 => Label::TargetSlot,
             6 => Label::VersionString,
             7 => Label::EncryptedDigest,
-            8 => Label::KeyRef,
+            8 => Label::KeyId,
             _ => return Err(()),
         })
     }
@@ -107,13 +107,13 @@ impl<'b, C> minicbor::Decode<'b, C> for SuitDigest<'b> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Encrypted<'b> {
     digest: SuitDigest<'b>,
-    key_ref: AsciiStr<'b>,
+    key_id: AsciiStr<'b>,
 }
 
 impl<'b> Encrypted<'b> {
     /// Creates the encrypted-update pair from the payload digest and key reference.
-    pub fn new(digest: SuitDigest<'b>, key_ref: AsciiStr<'b>) -> Self {
-        Self { digest, key_ref }
+    pub fn new(digest: SuitDigest<'b>, key_id: AsciiStr<'b>) -> Self {
+        Self { digest, key_id }
     }
 
     /// The digest of the encrypted payload.
@@ -122,8 +122,8 @@ impl<'b> Encrypted<'b> {
     }
 
     /// The reference to the key info needed to decrypt the payload.
-    pub fn key_ref(&self) -> AsciiStr<'b> {
-        self.key_ref
+    pub fn key_id(&self) -> AsciiStr<'b> {
+        self.key_id
     }
 }
 
@@ -174,8 +174,8 @@ impl<'b> Manifest<'b> {
 
     /// Sets the encrypted-update fields together: the encrypted payload's digest and
     /// the reference to its key info.
-    pub fn with_encrypted(mut self, digest: SuitDigest<'b>, key_ref: AsciiStr<'b>) -> Self {
-        self.encrypted = Some(Encrypted::new(digest, key_ref));
+    pub fn with_encrypted(mut self, digest: SuitDigest<'b>, key_id: AsciiStr<'b>) -> Self {
+        self.encrypted = Some(Encrypted::new(digest, key_id));
         self
     }
 
@@ -254,8 +254,8 @@ impl<C> minicbor::Encode<C> for Manifest<'_> {
         if let Some(encrypted) = self.encrypted {
             e.u8(Label::EncryptedDigest as u8)?;
             encrypted.digest.encode(e, ctx)?;
-            e.u8(Label::KeyRef as u8)?;
-            encrypted.key_ref.encode(e, ctx)?;
+            e.u8(Label::KeyId as u8)?;
+            encrypted.key_id.encode(e, ctx)?;
         }
         Ok(())
     }
@@ -273,7 +273,7 @@ impl<'b, C> minicbor::Decode<'b, C> for Manifest<'b> {
         let mut target_slot = None;
         let mut version_string = None;
         let mut encrypted_digest = None;
-        let mut key_ref = None;
+        let mut key_id = None;
         // Canonical decode: map labels must be strictly ascending. This rejects both
         // out-of-order keys and duplicate keys (an equal label fails the `>` test), so a
         // signed manifest has exactly one valid encoding and cannot be parsed two ways.
@@ -296,16 +296,16 @@ impl<'b, C> minicbor::Decode<'b, C> for Manifest<'b> {
                 Label::TargetSlot => target_slot = Some(d.u8()?),
                 Label::VersionString => version_string = Some(d.decode()?),
                 Label::EncryptedDigest => encrypted_digest = Some(d.decode()?),
-                Label::KeyRef => key_ref = Some(d.decode()?),
+                Label::KeyId => key_id = Some(d.decode()?),
             }
         }
         // The encrypted-update fields are paired: both present or both absent.
-        let encrypted = match (encrypted_digest, key_ref) {
-            (Some(digest), Some(key_ref)) => Some(Encrypted::new(digest, key_ref)),
+        let encrypted = match (encrypted_digest, key_id) {
+            (Some(digest), Some(key_id)) => Some(Encrypted::new(digest, key_id)),
             (None, None) => None,
             _ => {
                 return Err(minicbor::decode::Error::message(
-                    "encrypted_digest and key_ref must both be present or both absent",
+                    "encrypted_digest and key_id must both be present or both absent",
                 ));
             }
         };
@@ -446,8 +446,8 @@ mod tests {
     }
 
     #[test]
-    fn rejects_encrypted_digest_without_key_ref() {
-        // map(6) with encrypted_digest (label 7) but no key_ref (label 8).
+    fn rejects_encrypted_digest_without_key_id() {
+        // map(6) with encrypted_digest (label 7) but no key_id (label 8).
         let wire = [
             0xa6, // map(6)
             0x01, 0x01, //
@@ -455,7 +455,7 @@ mod tests {
             0x03, 0x63, b'k', b'o', b'f', //
             0x04, 0x82, 0x2f, 0x42, 0xAB, 0xCD, //
             0x05, 0x00, //
-            0x07, 0x82, 0x2f, 0x42, 0xBB, 0xCC, // encrypted_digest, no key_ref -> reject
+            0x07, 0x82, 0x2f, 0x42, 0xBB, 0xCC, // encrypted_digest, no key_id -> reject
         ];
         let r: Result<Manifest, _> = codec::decode(&wire);
         assert!(r.is_err());
@@ -496,10 +496,10 @@ mod tests {
         let payload_digest = SuitDigest::new(AlgId::new(-16), &[0x22; 32]);
         let version_string = AsciiStr::try_from("1.2.3").unwrap();
         let encrypted_digest = SuitDigest::new(AlgId::new(-16), &[0x33; 32]);
-        let key_ref = AsciiStr::try_from("device-root").unwrap();
+        let key_id = AsciiStr::try_from("device-root").unwrap();
         let original = Manifest::new(1, 42, class_id, payload_digest, 0)
             .with_version_string(version_string)
-            .with_encrypted(encrypted_digest, key_ref);
+            .with_encrypted(encrypted_digest, key_id);
         let bytes = codec::encode(&original).expect("encode");
         let decoded: Manifest = codec::decode(&bytes).expect("decode");
         assert_eq!(decoded, original);
@@ -518,17 +518,17 @@ mod tests {
         // Self-consistency vector: a local-profile manifest has no published KAT, so we
         // freeze a fixed manifest <-> these exact bytes as a determinism/regression guard.
         // version 1, sequence 42, class_id "acme-rtos", SHA-256 (-16) digests,
-        // target_slot 0, version_string "1.2.3", key_ref "device-root".
+        // target_slot 0, version_string "1.2.3", key_id "device-root".
         const KAT_HEX: &str = "a8010102182a036961636d652d72746f7304822f5820aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa05000665312e322e3307822f5820bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb086b6465766963652d726f6f74";
 
         let class_id = AsciiStr::try_from("acme-rtos").unwrap();
         let payload_digest = SuitDigest::new(AlgId::new(-16), &[0xAA; 32]);
         let version_string = AsciiStr::try_from("1.2.3").unwrap();
         let encrypted_digest = SuitDigest::new(AlgId::new(-16), &[0xBB; 32]);
-        let key_ref = AsciiStr::try_from("device-root").unwrap();
+        let key_id = AsciiStr::try_from("device-root").unwrap();
         let original = Manifest::new(1, 42, class_id, payload_digest, 0)
             .with_version_string(version_string)
-            .with_encrypted(encrypted_digest, key_ref);
+            .with_encrypted(encrypted_digest, key_id);
 
         // Encode direction: the structure produces exactly the frozen bytes.
         let bytes = codec::encode(&original).expect("encode");
