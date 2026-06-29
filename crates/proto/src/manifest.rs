@@ -9,7 +9,8 @@
 //! proto frames and parses the bytes; hashing the image and checking the signature
 //! are the crypto / verifier layer's job.
 
-use crate::codec::{Decode, DecodeError, Decoder, Encode, EncodeError, Encoder, Write};
+use minicbor::encode::Write;
+
 use crate::{alg::AlgId, ascii::AsciiStr};
 
 const LABEL_VERSION: u8 = 1;
@@ -48,22 +49,25 @@ impl<'b> SuitDigest<'b> {
     }
 }
 
-impl<C> Encode<C> for SuitDigest<'_> {
-    fn encode<W: Write>(
+impl<C> minicbor::Encode<C> for SuitDigest<'_> {
+    fn encode<W>(
         &self,
-        e: &mut Encoder<W>,
+        e: &mut minicbor::Encoder<W>,
         ctx: &mut C,
-    ) -> Result<(), EncodeError<W::Error>> {
+    ) -> Result<(), minicbor::encode::Error<W::Error>>
+    where
+        W: Write,
+    {
         e.array(2)?;
         self.alg.encode(e, ctx)?;
         e.bytes(self.bytes)?.ok()
     }
 }
 
-impl<'b, C> Decode<'b, C> for SuitDigest<'b> {
-    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, DecodeError> {
+impl<'b, C> minicbor::Decode<'b, C> for SuitDigest<'b> {
+    fn decode(d: &mut minicbor::Decoder<'b>, _: &mut C) -> Result<Self, minicbor::decode::Error> {
         if d.array()? != Some(2) {
-            return Err(DecodeError::message(
+            return Err(minicbor::decode::Error::message(
                 "SUIT digest must be a 2-element array",
             ));
         }
@@ -180,12 +184,15 @@ impl<'b> Manifest<'b> {
     }
 }
 
-impl<C> Encode<C> for Manifest<'_> {
-    fn encode<W: Write>(
+impl<C> minicbor::Encode<C> for Manifest<'_> {
+    fn encode<W>(
         &self,
-        e: &mut Encoder<W>,
+        e: &mut minicbor::Encoder<W>,
         ctx: &mut C,
-    ) -> Result<(), EncodeError<W::Error>> {
+    ) -> Result<(), minicbor::encode::Error<W::Error>>
+    where
+        W: Write,
+    {
         let entries = 5
             + self.version_string.is_some() as u64
             + self.encrypted_digest.is_some() as u64
@@ -215,11 +222,11 @@ impl<C> Encode<C> for Manifest<'_> {
     }
 }
 
-impl<'b, C> Decode<'b, C> for Manifest<'b> {
-    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, DecodeError> {
+impl<'b, C> minicbor::Decode<'b, C> for Manifest<'b> {
+    fn decode(d: &mut minicbor::Decoder<'b>, _: &mut C) -> Result<Self, minicbor::decode::Error> {
         let entries = d
             .map()?
-            .ok_or_else(|| DecodeError::message("manifest must be a definite map"))?;
+            .ok_or_else(|| minicbor::decode::Error::message("manifest must be a definite map"))?;
         let mut version = None;
         let mut sequence = None;
         let mut class_id = None;
@@ -238,23 +245,27 @@ impl<'b, C> Decode<'b, C> for Manifest<'b> {
                 LABEL_VERSION_STRING => version_string = Some(d.decode()?),
                 LABEL_ENCRYPTED_DIGEST => encrypted_digest = Some(d.decode()?),
                 LABEL_KEY_REF => key_ref = Some(d.decode()?),
-                _ => return Err(DecodeError::message("unknown manifest label")),
+                _ => return Err(minicbor::decode::Error::message("unknown manifest label")),
             }
         }
         // The encrypted-update fields are paired: both present or both absent.
         if encrypted_digest.is_some() != key_ref.is_some() {
-            return Err(DecodeError::message(
+            return Err(minicbor::decode::Error::message(
                 "encrypted_digest and key_ref must both be present or both absent",
             ));
         }
         Ok(Self {
-            version: version.ok_or_else(|| DecodeError::message("manifest missing version"))?,
-            sequence: sequence.ok_or_else(|| DecodeError::message("manifest missing sequence"))?,
-            class_id: class_id.ok_or_else(|| DecodeError::message("manifest missing class_id"))?,
-            payload_digest: payload_digest
-                .ok_or_else(|| DecodeError::message("manifest missing payload_digest"))?,
+            version: version
+                .ok_or_else(|| minicbor::decode::Error::message("manifest missing version"))?,
+            sequence: sequence
+                .ok_or_else(|| minicbor::decode::Error::message("manifest missing sequence"))?,
+            class_id: class_id
+                .ok_or_else(|| minicbor::decode::Error::message("manifest missing class_id"))?,
+            payload_digest: payload_digest.ok_or_else(|| {
+                minicbor::decode::Error::message("manifest missing payload_digest")
+            })?,
             target_slot: target_slot
-                .ok_or_else(|| DecodeError::message("manifest missing target_slot"))?,
+                .ok_or_else(|| minicbor::decode::Error::message("manifest missing target_slot"))?,
             version_string,
             encrypted_digest,
             key_ref,

@@ -5,7 +5,7 @@
 //! actual signing, verifying, and encryption live in the crypto layer, wired by a
 //! consumer.
 
-use minicbor::{Encode, data::Type, encode::Write, encode::write::Cursor};
+use minicbor::{data::Type, encode::Write, encode::write::Cursor};
 
 use crate::{alg::AlgId, ascii::AsciiStr};
 
