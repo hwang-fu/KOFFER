@@ -16,13 +16,33 @@ use crate::{
     manifest::{Manifest, SuitDigest},
 };
 
-// Request tags (host -> device).
-const REQ_HANDSHAKE: u8 = 1;
-const REQ_GET_INFO: u8 = 2;
-const REQ_INIT_KEYS: u8 = 3;
-const REQ_SIGN: u8 = 4;
-const REQ_INSTALL_IMAGE: u8 = 5;
-const REQ_ATTEST: u8 = 6;
+/// Wire tag for each `Request` variant (host -> device): the leading integer of the
+/// message's CBOR array. The `#[repr(u8)]` discriminant is the on-wire byte value.
+#[repr(u8)]
+enum RequestTag {
+    Handshake = 1,
+    GetInfo = 2,
+    InitKeys = 3,
+    Sign = 4,
+    InstallEncryptedImage = 5,
+    Attest = 6,
+}
+
+impl TryFrom<u8> for RequestTag {
+    type Error = ();
+
+    fn try_from(tag: u8) -> Result<Self, Self::Error> {
+        Ok(match tag {
+            1 => RequestTag::Handshake,
+            2 => RequestTag::GetInfo,
+            3 => RequestTag::InitKeys,
+            4 => RequestTag::Sign,
+            5 => RequestTag::InstallEncryptedImage,
+            6 => RequestTag::Attest,
+            _ => return Err(()),
+        })
+    }
+}
 
 // Response tags (device -> host).
 const RESP_INFO: u8 = 1;
@@ -81,14 +101,14 @@ impl<C> minicbor::Encode<C> for Request<'_> {
     {
         match self {
             Request::Handshake { payload } => {
-                e.array(2)?.u8(REQ_HANDSHAKE)?;
+                e.array(2)?.u8(RequestTag::Handshake as u8)?;
                 e.bytes(payload)?;
             }
             Request::GetInfo => {
-                e.array(1)?.u8(REQ_GET_INFO)?;
+                e.array(1)?.u8(RequestTag::GetInfo as u8)?;
             }
             Request::InitKeys { sig_alg, kem_alg } => {
-                e.array(3)?.u8(REQ_INIT_KEYS)?;
+                e.array(3)?.u8(RequestTag::InitKeys as u8)?;
                 sig_alg.encode(e, ctx)?;
                 kem_alg.encode(e, ctx)?;
             }
@@ -97,7 +117,7 @@ impl<C> minicbor::Encode<C> for Request<'_> {
                 digest,
                 summary,
             } => {
-                e.array(4)?.u8(REQ_SIGN)?;
+                e.array(4)?.u8(RequestTag::Sign as u8)?;
                 alg.encode(e, ctx)?;
                 digest.encode(e, ctx)?;
                 summary.encode(e, ctx)?;
@@ -107,13 +127,13 @@ impl<C> minicbor::Encode<C> for Request<'_> {
                 ciphertext,
                 manifest,
             } => {
-                e.array(4)?.u8(REQ_INSTALL_IMAGE)?;
+                e.array(4)?.u8(RequestTag::InstallEncryptedImage as u8)?;
                 kem_alg.encode(e, ctx)?;
                 e.bytes(ciphertext)?;
                 manifest.encode(e, ctx)?;
             }
             Request::Attest { nonce } => {
-                e.array(2)?.u8(REQ_ATTEST)?;
+                e.array(2)?.u8(RequestTag::Attest as u8)?;
                 e.bytes(nonce)?;
             }
         }
@@ -126,23 +146,25 @@ impl<'b, C> minicbor::Decode<'b, C> for Request<'b> {
         let len = d
             .array()?
             .ok_or_else(|| minicbor::decode::Error::message("request must be a definite array"))?;
-        match d.u8()? {
-            REQ_HANDSHAKE => {
+        let tag = RequestTag::try_from(d.u8()?)
+            .map_err(|_| minicbor::decode::Error::message("unknown request tag"))?;
+        match tag {
+            RequestTag::Handshake => {
                 expect_len(len, 2)?;
                 let payload = d.bytes()?;
                 Ok(Request::Handshake { payload })
             }
-            REQ_GET_INFO => {
+            RequestTag::GetInfo => {
                 expect_len(len, 1)?;
                 Ok(Request::GetInfo)
             }
-            REQ_INIT_KEYS => {
+            RequestTag::InitKeys => {
                 expect_len(len, 3)?;
                 let sig_alg = d.decode()?;
                 let kem_alg = d.decode()?;
                 Ok(Request::InitKeys { sig_alg, kem_alg })
             }
-            REQ_SIGN => {
+            RequestTag::Sign => {
                 expect_len(len, 4)?;
                 let alg = d.decode()?;
                 let digest = d.decode()?;
@@ -153,7 +175,7 @@ impl<'b, C> minicbor::Decode<'b, C> for Request<'b> {
                     summary,
                 })
             }
-            REQ_INSTALL_IMAGE => {
+            RequestTag::InstallEncryptedImage => {
                 expect_len(len, 4)?;
                 let kem_alg = d.decode()?;
                 let ciphertext = d.bytes()?;
@@ -164,12 +186,11 @@ impl<'b, C> minicbor::Decode<'b, C> for Request<'b> {
                     manifest,
                 })
             }
-            REQ_ATTEST => {
+            RequestTag::Attest => {
                 expect_len(len, 2)?;
                 let nonce = d.bytes()?;
                 Ok(Request::Attest { nonce })
             }
-            _ => Err(minicbor::decode::Error::message("unknown request tag")),
         }
     }
 }
@@ -394,14 +415,14 @@ mod tests {
 
     #[test]
     fn decodes_get_info_without_alloc() {
-        let wire = [0x81, REQ_GET_INFO]; // array(1) [ tag ]
+        let wire = [0x81, RequestTag::GetInfo as u8]; // array(1) [ tag ]
         let r: Request = codec::decode(&wire).expect("decode");
         assert_eq!(r, Request::GetInfo);
     }
 
     #[test]
     fn decodes_init_keys_without_alloc() {
-        let wire = [0x83, REQ_INIT_KEYS, 0x01, 0x02]; // array(3) [ tag, 1, 2 ]
+        let wire = [0x83, RequestTag::InitKeys as u8, 0x01, 0x02]; // array(3) [ tag, 1, 2 ]
         let r: Request = codec::decode(&wire).expect("decode");
         assert_eq!(
             r,
@@ -414,7 +435,7 @@ mod tests {
 
     #[test]
     fn decodes_attest_without_alloc() {
-        let wire = [0x82, REQ_ATTEST, 0x43, 0xAA, 0xBB, 0xCC]; // array(2) [ tag, h'AABBCC' ]
+        let wire = [0x82, RequestTag::Attest as u8, 0x43, 0xAA, 0xBB, 0xCC]; // array(2) [ tag, h'AABBCC' ]
         let r: Request = codec::decode(&wire).expect("decode");
         assert_eq!(
             r,
@@ -433,7 +454,7 @@ mod tests {
 
     #[test]
     fn rejects_wrong_request_array_length() {
-        let wire = [0x82, REQ_INIT_KEYS, 0x01]; // InitKeys tag but array(2)
+        let wire = [0x82, RequestTag::InitKeys as u8, 0x01]; // InitKeys tag but array(2)
         let r: Result<Request, _> = codec::decode(&wire);
         assert!(r.is_err());
     }
@@ -628,7 +649,7 @@ mod tests {
     fn rejects_non_ascii_sign_summary() {
         // Sign with valid alg + digest, then a non-ASCII summary -> F15 reject.
         let wire = [
-            0x84, REQ_SIGN, // array(4), Sign tag
+            0x84, RequestTag::Sign as u8, // array(4), Sign tag
             0x26,     // alg = -7
             0x82, 0x2f, 0x42, 0xAB, 0xCD, // digest = [-16, h'ABCD']
             0x65, 0x63, 0x61, 0x66, 0xc3, 0xa9, // summary = "café"
