@@ -39,7 +39,7 @@ pub enum SealError {
     Kem(KemError),
     /// The KDF step failed.
     Kdf(KdfError),
-    /// The AEAD step failed; `Aead(AeadError::OpenFailed)` means tampering or the wrong key.
+    /// The AEAD step failed; `Aead(AeadError::UnsealFailed)` means tampering or the wrong key.
     Aead(AeadError),
     /// An internal invariant was violated (should not happen).
     Internal,

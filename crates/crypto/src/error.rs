@@ -59,19 +59,19 @@ pub enum KemError {
     Internal,
 }
 
-/// What can go wrong during authenticated encryption (sealing or opening).
+/// What can go wrong during authenticated encryption (sealing or unsealing).
 ///
-/// `OpenFailed` is the security-critical case: the authentication tag did not
+/// `UnsealFailed` is the security-critical case: the authentication tag did not
 /// match, so the ciphertext or the associated data was altered (or the wrong
 /// key or nonce was used). No plaintext is ever released in that case, and every
 /// authentication failure returns this same error -- the caller is told nothing
-/// that could distinguish why opening failed.
+/// that could distinguish why unsealing failed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum AeadError {
     /// Authentication failed: the tag did not match the ciphertext, associated
     /// data, key, and nonce. No plaintext is released.
-    OpenFailed,
+    UnsealFailed,
     /// The supplied key bytes are not a valid AEAD key (wrong length).
     MalformedKey,
     /// The supplied nonce is not the size the AEAD requires.

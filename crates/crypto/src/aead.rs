@@ -58,7 +58,7 @@ pub trait Aead {
 
     /// Verifies `tag` over `buffer` and `aad`, then decrypts `buffer` in place.
     ///
-    /// Returns `Err(AeadError::OpenFailed)` if authentication fails, leaving the
+    /// Returns `Err(AeadError::UnsealFailed)` if authentication fails, leaving the
     /// buffer's contents unauthenticated and no plaintext trusted.
     fn unseal(
         &self,
@@ -112,11 +112,11 @@ fn unseal_with<C: AeadInPlace + KeyInit>(
     let cipher = load_cipher::<C>(key)?;
     let nonce = nonce_bytes(nonce)?;
     // A wrong-length tag cannot authenticate, so it is reported as a plain
-    // open failure rather than a distinct error.
+    // unseal failure rather than a distinct error.
     let tag: [u8; TAG_LEN] = tag
         .as_slice()
         .try_into()
-        .map_err(|_| AeadError::OpenFailed)?;
+        .map_err(|_| AeadError::UnsealFailed)?;
     cipher
         .decrypt_in_place_detached(
             GenericArray::from_slice(&nonce),
@@ -124,7 +124,7 @@ fn unseal_with<C: AeadInPlace + KeyInit>(
             buffer,
             GenericArray::from_slice(&tag),
         )
-        .map_err(|_| AeadError::OpenFailed)
+        .map_err(|_| AeadError::UnsealFailed)
 }
 
 /// The AES-256-GCM AEAD backend.
@@ -273,7 +273,7 @@ mod tests {
         buffer[0] ^= 0x01;
         assert_eq!(
             backend.unseal(&key, &nonce, aad, &mut buffer, &tag),
-            Err(AeadError::OpenFailed)
+            Err(AeadError::UnsealFailed)
         );
     }
 
@@ -284,7 +284,7 @@ mod tests {
         let tag = Tag::try_from(&bytes[..]).unwrap();
         assert_eq!(
             backend.unseal(&key, &nonce, aad, &mut buffer, &tag),
-            Err(AeadError::OpenFailed)
+            Err(AeadError::UnsealFailed)
         );
     }
 
@@ -292,7 +292,7 @@ mod tests {
         let (key, nonce, _aad, mut buffer, tag) = seal_fixture(backend);
         assert_eq!(
             backend.unseal(&key, &nonce, b"HEADER", &mut buffer, &tag),
-            Err(AeadError::OpenFailed)
+            Err(AeadError::UnsealFailed)
         );
     }
 
