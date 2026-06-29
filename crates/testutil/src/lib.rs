@@ -26,16 +26,16 @@ impl TestRng {
 impl TryRng for TestRng {
     type Error = Infallible;
 
-    fn try_next_u32(&mut self) -> Result<u32, Infallible> {
+    fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
         Ok(self.try_next_u64()? as u32)
     }
 
-    fn try_next_u64(&mut self) -> Result<u64, Infallible> {
+    fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
         self.0 = self.0.wrapping_add(1);
         Ok(self.0)
     }
 
-    fn try_fill_bytes(&mut self, dst: &mut [u8]) -> Result<(), Infallible> {
+    fn try_fill_bytes(&mut self, dst: &mut [u8]) -> Result<(), Self::Error> {
         for chunk in dst.chunks_mut(8) {
             let value = self.try_next_u64()?.to_le_bytes();
             chunk.copy_from_slice(&value[..chunk.len()]);
