@@ -5,7 +5,7 @@
 //! actual signing, verifying, and encryption live in the crypto layer, wired by a
 //! consumer.
 
-use minicbor::{data::Type, encode::Write, encode::write::Cursor};
+use minicbor::{Encode, data::Type, encode::Write, encode::write::Cursor};
 
 use crate::{alg::AlgId, ascii::AsciiStr};
 
@@ -274,6 +274,52 @@ impl<'b, C> minicbor::Decode<'b, C> for ProtectedHeader {
     }
 }
 
+/// Encodes the COSE unprotected header that carries an optional key id: the single-entry
+/// map `{4: kid}` when present, or the empty map `{}` when absent. Shared by `CoseSign1`
+/// and `Recipient`, which carry the same header.
+fn encode_kid_header<C, W>(
+    e: &mut minicbor::Encoder<W>,
+    kid: Option<AsciiStr<'_>>,
+    ctx: &mut C,
+) -> Result<(), minicbor::encode::Error<W::Error>>
+where
+    W: Write,
+{
+    match kid {
+        Some(kid) => {
+            e.map(1)?.u8(LABEL_KID)?;
+            kid.encode(e, ctx)?;
+        }
+        None => {
+            e.map(0)?;
+        }
+    }
+    Ok(())
+}
+
+/// Decodes the optional-key-id unprotected header: the empty map `{}` (no kid) or the
+/// single-entry map `{4: kid}`. Any other shape is rejected. Shared by `CoseSign1` and
+/// `Recipient`.
+fn decode_kid_header<'b>(
+    d: &mut minicbor::Decoder<'b>,
+) -> Result<Option<AsciiStr<'b>>, minicbor::decode::Error> {
+    match d.map()? {
+        Some(0) => Ok(None),
+        Some(1) => {
+            if d.u8()? != LABEL_KID {
+                return Err(minicbor::decode::Error::message(
+                    "unexpected unprotected header label",
+                ));
+            }
+            let kid: AsciiStr = d.decode()?; // printable-ASCII validated on decode
+            Ok(Some(kid))
+        }
+        _ => Err(minicbor::decode::Error::message(
+            "unexpected unprotected header",
+        )),
+    }
+}
+
 impl<C> minicbor::Encode<C> for CoseSign1<'_> {
     fn encode<W>(
         &self,
@@ -285,15 +331,7 @@ impl<C> minicbor::Encode<C> for CoseSign1<'_> {
     {
         e.array(4)?;
         self.protected.encode(e, ctx)?;
-        match self.kid {
-            Some(kid) => {
-                e.map(1)?.u8(LABEL_KID)?;
-                kid.encode(e, ctx)?;
-            }
-            None => {
-                e.map(0)?;
-            }
-        }
+        encode_kid_header(e, self.kid, ctx)?;
         match self.payload {
             Payload::Detached => {
                 e.null()?;
@@ -314,23 +352,7 @@ impl<'b, C> minicbor::Decode<'b, C> for CoseSign1<'b> {
             ));
         }
         let protected: ProtectedHeader = d.decode()?;
-        let kid = match d.map()? {
-            Some(0) => None,
-            Some(1) => {
-                if d.u8()? != LABEL_KID {
-                    return Err(minicbor::decode::Error::message(
-                        "unexpected unprotected header label",
-                    ));
-                }
-                let kid: AsciiStr = d.decode()?; // F15-validated on decode
-                Some(kid)
-            }
-            _ => {
-                return Err(minicbor::decode::Error::message(
-                    "unexpected unprotected header",
-                ));
-            }
-        };
+        let kid = decode_kid_header(d)?;
         let payload = if d.datatype()? == Type::Null {
             d.null()?;
             Payload::Detached
@@ -376,15 +398,7 @@ impl<C> minicbor::Encode<C> for Recipient<'_> {
     {
         e.array(3)?;
         self.protected.encode(e, ctx)?;
-        match self.kid {
-            Some(kid) => {
-                e.map(1)?.u8(LABEL_KID)?;
-                kid.encode(e, ctx)?;
-            }
-            None => {
-                e.map(0)?;
-            }
-        }
+        encode_kid_header(e, self.kid, ctx)?;
         e.bytes(self.encapsulation)?.ok()
     }
 }
@@ -397,23 +411,7 @@ impl<'b, C> minicbor::Decode<'b, C> for Recipient<'b> {
             ));
         }
         let protected: ProtectedHeader = d.decode()?;
-        let kid = match d.map()? {
-            Some(0) => None,
-            Some(1) => {
-                if d.u8()? != LABEL_KID {
-                    return Err(minicbor::decode::Error::message(
-                        "unexpected recipient header label",
-                    ));
-                }
-                let kid: AsciiStr = d.decode()?;
-                Some(kid)
-            }
-            _ => {
-                return Err(minicbor::decode::Error::message(
-                    "unexpected recipient header",
-                ));
-            }
-        };
+        let kid = decode_kid_header(d)?;
         let encapsulation = d.bytes()?;
         Ok(Self {
             protected,
