@@ -35,8 +35,6 @@ jobs:
         run: cargo build --workspace --all-targets
       - name: Test
         run: cargo test --workspace
-      - name: Format
-        run: cargo fmt --all --check
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
 
@@ -51,3 +49,14 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Build (no_std, Cortex-M33F)
         run: cargo build --target thumbv8m.main-none-eabihf -p koffer-proto -p koffer-crypto
+
+  fmt:
+    name: rustfmt (nightly)
+    if: ${{ !startsWith(github.event.head_commit.message, 'docs') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install nightly rustfmt
+        run: rustup toolchain install nightly --profile minimal --component rustfmt --no-self-update
+      - name: Format (nightly rustfmt)
+        run: cargo +nightly fmt --all --check
