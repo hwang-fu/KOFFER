@@ -19,3 +19,8 @@ opt-level = 3
 opt-level = 3
 [profile.dev.package.ml-kem]
 opt-level = 3
+
+# Thin LTO for release builds: cross-crate inlining and dead-code elimination, mainly to
+# shrink and speed the embedded firmware. Thin keeps the compile fast and parallel.
+[profile.release]
+lto = "thin"
