@@ -26,17 +26,17 @@ pub const NONCE_LEN: usize = 12; // 96-bit GCM nonce
 pub const TAG_LEN: usize = 16; // 128-bit GCM tag
 
 secret_bytes_newtype! {
-    /// A symmetric AEAD key, as raw bytes. 32 bytes for AES-256-GCM.
+    /// A symmetric AEAD key, as raw bytes. 32 bytes for both backends.
     Key, KEY_LEN
 }
 
 bytes_newtype! {
-    /// An AEAD nonce ("number used once"), as raw bytes. 12 bytes for AES-256-GCM.
+    /// An AEAD nonce ("number used once"), as raw bytes. 12 bytes for both backends.
     Nonce, NONCE_LEN
 }
 
 bytes_newtype! {
-    /// An AEAD authentication tag, as raw bytes. 16 bytes for AES-256-GCM.
+    /// An AEAD authentication tag, as raw bytes. 16 bytes for both backends.
     Tag, TAG_LEN
 }
 
