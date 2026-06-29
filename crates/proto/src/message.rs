@@ -6,8 +6,7 @@
 //! Text fields are printable-ASCII (F15); byte fields borrow the input, zero-copy, like
 //! the COSE and manifest types.
 
-use minicbor::Encode;
-use minicbor::encode::Write;
+use minicbor::{Encode, encode::Write};
 
 use crate::{
     alg::AlgId,
