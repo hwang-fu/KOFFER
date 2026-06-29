@@ -1,8 +1,8 @@
 //! CBOR-serializable bounded byte buffers for the wire.
 
-use crate::codec::{Decode, DecodeError, Decoder, Encode, EncodeError, Encoder, Write};
 use base::bytes::{Bytes, TooLong};
 use core::ops::Deref;
+use minicbor::encode::Write;
 
 /// A wire byte string of at most `MAX` bytes.
 ///
@@ -46,17 +46,25 @@ impl<const MAX: usize> AsRef<[u8]> for CborBytes<MAX> {
     }
 }
 
-impl<C, const MAX: usize> Encode<C> for CborBytes<MAX> {
-    fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), EncodeError<W::Error>> {
+impl<C, const MAX: usize> minicbor::Encode<C> for CborBytes<MAX> {
+    fn encode<W>(
+        &self,
+        e: &mut minicbor::Encoder<W>,
+        _: &mut C,
+    ) -> Result<(), minicbor::encode::Error<W::Error>>
+    where
+        W: Write,
+    {
         e.bytes(self.as_slice())?.ok()
     }
 }
 
-impl<'b, C, const MAX: usize> Decode<'b, C> for CborBytes<MAX> {
-    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, DecodeError> {
+impl<'b, C, const MAX: usize> minicbor::Decode<'b, C> for CborBytes<MAX> {
+    fn decode(d: &mut minicbor::Decoder<'b>, _: &mut C) -> Result<Self, minicbor::decode::Error> {
         let bytes = d.bytes()?;
-        Self::try_from(bytes)
-            .map_err(|_| DecodeError::message("byte sequence exceeds the maximum length"))
+        Self::try_from(bytes).map_err(|_| {
+            minicbor::decode::Error::message("byte sequence exceeds the maximum length")
+        })
     }
 }
 
