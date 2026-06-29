@@ -1,7 +1,7 @@
 //! dudect-style constant-time timing harness for ML-KEM decapsulation.
 //! Best-effort empirical evidence that decapsulation does not leak through timing, within
 //! the measured budget -- not a proof. Run with:
-//!   cargo bench -p koffer-crypto --bench ct_decap
+//!   cargo run -p koffer-crypto --release --example ct_decap
 //!
 //! Method: dudect's fixed-vs-random t-test. The secret decapsulation key is fixed. The
 //! `Left` class decapsulates one fixed VALID ciphertext (the real-secret path); the `Right`

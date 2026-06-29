@@ -32,7 +32,3 @@ zeroize = { version = "1.9.0", default-features = false }
 [dev-dependencies]
 dudect-bencher = "0.7.0"
 proptest = "1.11.0"
-
-[[bench]]
-name = "ct_decap"
-harness = false
