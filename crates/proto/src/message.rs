@@ -11,7 +11,7 @@ use minicbor::{Encode, encode::Write};
 use crate::{
     alg::AlgId,
     ascii::AsciiStr,
-    cose::CoseSign1,
+    cose::{CoseEncrypt, CoseSign1},
     error::ErrorCode,
     manifest::{Manifest, SuitDigest},
 };
@@ -99,10 +99,9 @@ pub enum Request<'b> {
     },
     /// Install an encrypted firmware image (`-> Response::BootDecision`).
     InstallEncryptedImage {
-        /// KEM algorithm of the wrapped content key.
-        kem_alg: AlgId,
-        /// The AEAD-encrypted image.
-        ciphertext: &'b [u8],
+        /// The encrypted image as a `COSE_Encrypt`: the AEAD algorithm, nonce, the
+        /// encrypted bytes, and the recipient holding the wrapped content key.
+        image: CoseEncrypt<'b>,
         /// The signed manifest binding the image.
         manifest: Manifest<'b>,
     },
@@ -142,14 +141,9 @@ impl<C> minicbor::Encode<C> for Request<'_> {
                 digest.encode(e, ctx)?;
                 summary.encode(e, ctx)?;
             }
-            Request::InstallEncryptedImage {
-                kem_alg,
-                ciphertext,
-                manifest,
-            } => {
-                e.array(4)?.u8(RequestTag::InstallEncryptedImage as u8)?;
-                kem_alg.encode(e, ctx)?;
-                e.bytes(ciphertext)?;
+            Request::InstallEncryptedImage { image, manifest } => {
+                e.array(3)?.u8(RequestTag::InstallEncryptedImage as u8)?;
+                image.encode(e, ctx)?;
                 manifest.encode(e, ctx)?;
             }
             Request::Attest { nonce } => {
@@ -196,15 +190,10 @@ impl<'b, C> minicbor::Decode<'b, C> for Request<'b> {
                 })
             }
             RequestTag::InstallEncryptedImage => {
-                expect_len(len, 4)?;
-                let kem_alg = d.decode()?;
-                let ciphertext = d.bytes()?;
+                expect_len(len, 3)?;
+                let image = d.decode()?;
                 let manifest = d.decode()?;
-                Ok(Request::InstallEncryptedImage {
-                    kem_alg,
-                    ciphertext,
-                    manifest,
-                })
+                Ok(Request::InstallEncryptedImage { image, manifest })
             }
             RequestTag::Attest => {
                 expect_len(len, 2)?;
@@ -563,16 +552,17 @@ mod tests {
     #[cfg(feature = "alloc")]
     #[test]
     fn request_install_encrypted_image_round_trips() {
+        use crate::cose::Recipient;
         let class_id = AsciiStr::try_from("acme-rtos").unwrap();
         let digest_bytes = [0x11u8; 32];
         let payload_digest = SuitDigest::new(AlgId::new(-16), &digest_bytes);
         let manifest = Manifest::new(1, 7, class_id, payload_digest, 0);
+        let encapsulation = [0xEEu8; 32];
+        let recipient = Recipient::new(AlgId::new(-48), None, &encapsulation);
+        let nonce = [0x22u8; 12];
         let ciphertext = [0xCDu8; 48];
-        round_trip_request(Request::InstallEncryptedImage {
-            kem_alg: AlgId::new(-48),
-            ciphertext: &ciphertext,
-            manifest,
-        });
+        let image = CoseEncrypt::new(AlgId::new(3), &nonce, &ciphertext, recipient);
+        round_trip_request(Request::InstallEncryptedImage { image, manifest });
     }
 
     #[cfg(feature = "alloc")]
@@ -752,14 +742,14 @@ mod tests {
             SuitDigest::new(AlgId::new(-16), &mdig),
             0,
         );
+        let nonce = [0xAA, 0xBB];
         let ct = [0xCD, 0xCE];
+        let enc = [0xEE, 0xFF];
+        let recipient = crate::cose::Recipient::new(AlgId::new(-48), None, &enc);
+        let image = CoseEncrypt::new(AlgId::new(3), &nonce, &ct, recipient);
         check_request_kat(
-            Request::InstallEncryptedImage {
-                kem_alg: AlgId::new(-48),
-                ciphertext: &ct,
-                manifest,
-            },
-            "8405382f42cdcea50101020103636b6f6604822f42abcd0500",
+            Request::InstallEncryptedImage { image, manifest },
+            "83058443a10103a10542aabb42cdce818344a101382fa042eeffa50101020103636b6f6604822f42abcd0500",
         );
         let nonce = [0x99, 0x88];
         check_request_kat(Request::Attest { nonce: &nonce }, "8206429988");
