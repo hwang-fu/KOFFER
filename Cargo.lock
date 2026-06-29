@@ -706,6 +706,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "koffer-testutil"
+version = "0.1.0"
+dependencies = [
+ "rand_core 0.10.1",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.186"
 source = "registry+https://github.com/rust-lang/crates.io-index"

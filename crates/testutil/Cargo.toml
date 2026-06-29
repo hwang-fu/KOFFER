@@ -1,0 +1,10 @@
+[package]
+name = "koffer-testutil"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+rand_core = { version = "0.10.1", default-features = false }
