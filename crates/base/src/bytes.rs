@@ -121,7 +121,7 @@ fn nibble(c: u8) -> Option<u8> {
 
 impl<const MAX: usize> AsRef<[u8]> for Bytes<MAX> {
     fn as_ref(&self) -> &[u8] {
-        self.0.as_slice()
+        self.as_slice()
     }
 }
 
@@ -129,7 +129,7 @@ impl<const MAX: usize> Deref for Bytes<MAX> {
     type Target = [u8];
 
     fn deref(&self) -> &[u8] {
-        self.0.as_slice()
+        self.as_slice()
     }
 }
 
@@ -143,14 +143,14 @@ impl<const MAX: usize> Eq for Bytes<MAX> {}
 
 impl<const MAX: usize> Hash for Bytes<MAX> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.as_slice().hash(state);
+        self.as_slice().hash(state);
     }
 }
 
 impl<const MAX: usize> ConstantTimeEq for Bytes<MAX> {
     fn ct_eq(&self, other: &Self) -> subtle::Choice {
         // Length is public; equal-length contents are compared with no early exit.
-        self.0.as_slice().ct_eq(other.0.as_slice())
+        self.as_slice().ct_eq(other.as_slice())
     }
 }
 
