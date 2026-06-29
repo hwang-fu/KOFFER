@@ -1,4 +1,4 @@
-//! Authenticated encryption (AEAD) value types and the AES-256-GCM backend.
+//! Authenticated encryption (AEAD) value types and the AES-256-GCM and ChaCha20-Poly1305 backends.
 //!
 //! "Authenticated encryption with associated data" gives confidentiality and
 //! tamper-detection together: `open` decrypts only if the ciphertext and the
@@ -13,27 +13,30 @@
 
 use aes_gcm::aead::generic_array::GenericArray;
 use aes_gcm::{AeadInPlace, Aes256Gcm as GcmCipher, KeyInit};
+// `AeadInPlace`, `KeyInit`, and `GenericArray` above come from the `aead` crate that both
+// RustCrypto AEADs re-export, so the ChaCha20-Poly1305 cipher reuses them; only the type differs.
+use chacha20poly1305::ChaCha20Poly1305 as ChaChaCipher;
 
 use crate::error::AeadError;
 
-// AES-256-GCM fixed sizes. A future ChaCha20-Poly1305 backend shares all three,
-// so these bounds are exact for every AEAD this crate plans to support.
+// Fixed AEAD sizes, shared by both backends: AES-256-GCM and ChaCha20-Poly1305
+// (RFC 8439) use a 32-byte key, a 12-byte nonce, and a 16-byte tag.
 pub const KEY_LEN: usize = 32; // AES-256 key
 pub const NONCE_LEN: usize = 12; // 96-bit GCM nonce
 pub const TAG_LEN: usize = 16; // 128-bit GCM tag
 
 secret_bytes_newtype! {
-    /// A symmetric AEAD key, as raw bytes. 32 bytes for AES-256-GCM.
+    /// A symmetric AEAD key, as raw bytes. 32 bytes for both backends.
     Key, KEY_LEN
 }
 
 bytes_newtype! {
-    /// An AEAD nonce ("number used once"), as raw bytes. 12 bytes for AES-256-GCM.
+    /// An AEAD nonce ("number used once"), as raw bytes. 12 bytes for both backends.
     Nonce, NONCE_LEN
 }
 
 bytes_newtype! {
-    /// An AEAD authentication tag, as raw bytes. 16 bytes for AES-256-GCM.
+    /// An AEAD authentication tag, as raw bytes. 16 bytes for both backends.
     Tag, TAG_LEN
 }
 
@@ -128,18 +131,79 @@ impl Aead for Aes256Gcm {
     }
 }
 
+/// The ChaCha20-Poly1305 AEAD backend (RFC 8439).
+pub struct ChaCha20Poly1305;
+
+impl ChaCha20Poly1305 {
+    /// Loads the cipher from a key, mapping a wrong-length key to `MalformedKey`.
+    fn cipher(key: &Key) -> Result<ChaChaCipher, AeadError> {
+        ChaChaCipher::new_from_slice(key.as_slice()).map_err(|_| AeadError::MalformedKey)
+    }
+
+    /// Validates the nonce length and copies it into a fixed array.
+    fn nonce_bytes(nonce: &Nonce) -> Result<[u8; NONCE_LEN], AeadError> {
+        nonce
+            .as_slice()
+            .try_into()
+            .map_err(|_| AeadError::MalformedNonce)
+    }
+}
+
+impl Aead for ChaCha20Poly1305 {
+    fn seal(
+        &self,
+        key: &Key,
+        nonce: &Nonce,
+        aad: &[u8],
+        buffer: &mut [u8],
+    ) -> Result<Tag, AeadError> {
+        let cipher = Self::cipher(key)?;
+        let nonce = Self::nonce_bytes(nonce)?;
+        let tag = cipher
+            .encrypt_in_place_detached(GenericArray::from_slice(&nonce), aad, buffer)
+            .map_err(|_| AeadError::Internal)?;
+        Tag::try_from(tag.as_slice()).map_err(|_| AeadError::Internal)
+    }
+
+    fn open(
+        &self,
+        key: &Key,
+        nonce: &Nonce,
+        aad: &[u8],
+        buffer: &mut [u8],
+        tag: &Tag,
+    ) -> Result<(), AeadError> {
+        let cipher = Self::cipher(key)?;
+        let nonce = Self::nonce_bytes(nonce)?;
+        let tag: [u8; TAG_LEN] = tag
+            .as_slice()
+            .try_into()
+            .map_err(|_| AeadError::OpenFailed)?;
+        cipher
+            .decrypt_in_place_detached(
+                GenericArray::from_slice(&nonce),
+                aad,
+                buffer,
+                GenericArray::from_slice(&tag),
+            )
+            .map_err(|_| AeadError::OpenFailed)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::kat::{assert_field, parse};
     use proptest::prelude::*;
 
-    const CAVP: &str = include_str!("../../../kat/aead/cavp-aes-256-gcm.kat");
+    const CAVP_AES_256_GCM: &str = include_str!("../../../kat/aead/cavp-aes-256-gcm.kat");
+    const RFC8439_CHACHA20_POLY1305: &str =
+        include_str!("../../../kat/aead/rfc8439-chacha20-poly1305.kat");
 
-    #[test]
-    fn cavp_aes_256_gcm_vectors() {
-        let records = parse(CAVP).unwrap();
-        let backend = Aes256Gcm;
+    // Runs the published known-answer vectors in `kat_text` against `backend`: seal must
+    // reproduce each record's ciphertext and tag, and open must recover the plaintext.
+    fn check_kat(backend: &dyn Aead, kat_text: &str) {
+        let records = parse(kat_text).unwrap();
         for record in &records {
             let key = Key::try_from(record.field("key").unwrap()).unwrap();
             let nonce = Nonce::try_from(record.field("nonce").unwrap()).unwrap();
@@ -159,7 +223,35 @@ mod tests {
         }
     }
 
-    // seal -> open recovers the plaintext for arbitrary key, nonce, AAD, and message.
+    #[test]
+    fn cavp_aes_256_gcm_vectors() {
+        check_kat(&Aes256Gcm, CAVP_AES_256_GCM);
+    }
+
+    #[test]
+    fn rfc8439_chacha20_poly1305_vectors() {
+        check_kat(&ChaCha20Poly1305, RFC8439_CHACHA20_POLY1305);
+    }
+
+    // The tests below exercise the `Aead` contract itself, so each runs through a `&dyn Aead`
+    // and can cover every backend. Per-backend known-answer vectors stay separate (the CAVP
+    // test above; the ChaCha20-Poly1305 vectors are added alongside it).
+
+    // seal -> open recovers the plaintext for the given key, nonce, AAD, and message.
+    fn check_roundtrip(
+        backend: &dyn Aead,
+        key: &Key,
+        nonce: &Nonce,
+        aad: &[u8],
+        plaintext: &[u8],
+    ) -> Result<(), TestCaseError> {
+        let mut buffer = plaintext.to_vec();
+        let tag = backend.seal(key, nonce, aad, &mut buffer).unwrap();
+        backend.open(key, nonce, aad, &mut buffer, &tag).unwrap();
+        prop_assert_eq!(buffer.as_slice(), plaintext);
+        Ok(())
+    }
+
     proptest! {
         #[test]
         fn seal_open_roundtrip(
@@ -168,31 +260,25 @@ mod tests {
             aad in prop::collection::vec(any::<u8>(), 0..64),
             plaintext in prop::collection::vec(any::<u8>(), 0..256),
         ) {
-            let backend = Aes256Gcm;
             let key = Key::try_from(&key[..]).unwrap();
             let nonce = Nonce::try_from(&nonce[..]).unwrap();
-
-            let mut buffer = plaintext.clone();
-            let tag = backend.seal(&key, &nonce, &aad, &mut buffer).unwrap();
-            backend.open(&key, &nonce, &aad, &mut buffer, &tag).unwrap();
-            prop_assert_eq!(buffer, plaintext);
+            check_roundtrip(&Aes256Gcm, &key, &nonce, &aad, &plaintext)?;
+            check_roundtrip(&ChaCha20Poly1305, &key, &nonce, &aad, &plaintext)?;
         }
     }
 
-    /// Seals a fixed message and returns the parts, for the tamper tests.
-    fn sealed() -> (Aes256Gcm, Key, Nonce, &'static [u8], Vec<u8>, Tag) {
-        let backend = Aes256Gcm;
-        let key = Key::try_from(&[0x11u8; 32][..]).unwrap();
-        let nonce = Nonce::try_from(&[0x22u8; 12][..]).unwrap();
+    /// Seals a fixed message with `backend` and returns the parts, for the tamper tests.
+    fn seal_fixture(backend: &dyn Aead) -> (Key, Nonce, &'static [u8], Vec<u8>, Tag) {
+        let key = Key::try_from(&[0x11u8; KEY_LEN][..]).unwrap();
+        let nonce = Nonce::try_from(&[0x22u8; NONCE_LEN][..]).unwrap();
         let aad: &[u8] = b"header";
         let mut buffer = b"secret payload".to_vec();
         let tag = backend.seal(&key, &nonce, aad, &mut buffer).unwrap();
-        (backend, key, nonce, aad, buffer, tag)
+        (key, nonce, aad, buffer, tag)
     }
 
-    #[test]
-    fn open_rejects_tampered_ciphertext() {
-        let (backend, key, nonce, aad, mut buffer, tag) = sealed();
+    fn check_rejects_tampered_ciphertext(backend: &dyn Aead) {
+        let (key, nonce, aad, mut buffer, tag) = seal_fixture(backend);
         buffer[0] ^= 0x01;
         assert_eq!(
             backend.open(&key, &nonce, aad, &mut buffer, &tag),
@@ -200,9 +286,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn open_rejects_tampered_tag() {
-        let (backend, key, nonce, aad, mut buffer, tag) = sealed();
+    fn check_rejects_tampered_tag(backend: &dyn Aead) {
+        let (key, nonce, aad, mut buffer, tag) = seal_fixture(backend);
         let mut bytes = tag.as_slice().to_vec();
         bytes[0] ^= 0x01;
         let tag = Tag::try_from(&bytes[..]).unwrap();
@@ -212,34 +297,55 @@ mod tests {
         );
     }
 
-    #[test]
-    fn open_rejects_tampered_aad() {
-        let (backend, key, nonce, _aad, mut buffer, tag) = sealed();
+    fn check_rejects_tampered_aad(backend: &dyn Aead) {
+        let (key, nonce, _aad, mut buffer, tag) = seal_fixture(backend);
         assert_eq!(
             backend.open(&key, &nonce, b"HEADER", &mut buffer, &tag),
             Err(AeadError::OpenFailed)
         );
     }
 
-    #[test]
-    fn rejects_malformed_key_and_nonce() {
-        let backend = Aes256Gcm;
-        let nonce = Nonce::try_from(&[0u8; 12][..]).unwrap();
+    fn check_rejects_malformed_key_and_nonce(backend: &dyn Aead) {
+        let nonce = Nonce::try_from(&[0u8; NONCE_LEN][..]).unwrap();
         let mut buffer = [0u8; 4];
 
-        // A 16-byte value is a valid `Key` newtype but not a valid AES-256 key.
+        // A 16-byte value is a valid `Key` newtype but not a valid 256-bit AEAD key.
         let short_key = Key::try_from(&[0u8; 16][..]).unwrap();
         assert_eq!(
             backend.seal(&short_key, &nonce, &[], &mut buffer),
             Err(AeadError::MalformedKey)
         );
 
-        // An 8-byte nonce is a valid `Nonce` newtype but not a 96-bit GCM nonce.
-        let key = Key::try_from(&[0u8; 32][..]).unwrap();
+        // An 8-byte nonce is a valid `Nonce` newtype but not a 96-bit AEAD nonce.
+        let key = Key::try_from(&[0u8; KEY_LEN][..]).unwrap();
         let short_nonce = Nonce::try_from(&[0u8; 8][..]).unwrap();
         assert_eq!(
             backend.seal(&key, &short_nonce, &[], &mut buffer),
             Err(AeadError::MalformedNonce)
         );
+    }
+
+    #[test]
+    fn open_rejects_tampered_ciphertext() {
+        check_rejects_tampered_ciphertext(&Aes256Gcm);
+        check_rejects_tampered_ciphertext(&ChaCha20Poly1305);
+    }
+
+    #[test]
+    fn open_rejects_tampered_tag() {
+        check_rejects_tampered_tag(&Aes256Gcm);
+        check_rejects_tampered_tag(&ChaCha20Poly1305);
+    }
+
+    #[test]
+    fn open_rejects_tampered_aad() {
+        check_rejects_tampered_aad(&Aes256Gcm);
+        check_rejects_tampered_aad(&ChaCha20Poly1305);
+    }
+
+    #[test]
+    fn rejects_malformed_key_and_nonce() {
+        check_rejects_malformed_key_and_nonce(&Aes256Gcm);
+        check_rejects_malformed_key_and_nonce(&ChaCha20Poly1305);
     }
 }
