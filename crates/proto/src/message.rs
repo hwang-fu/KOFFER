@@ -483,8 +483,15 @@ mod tests {
     #[test]
     fn rejects_non_ascii_error_detail() {
         let wire = [
-            0x83, ResponseTag::Error as u8, 0x01, // array(3), Error tag, code 1
-            0x65, 0x63, 0x61, 0x66, 0xc3, 0xa9, // detail = "café"
+            0x83,
+            ResponseTag::Error as u8,
+            0x01, // array(3), Error tag, code 1
+            0x65,
+            0x63,
+            0x61,
+            0x66,
+            0xc3,
+            0xa9, // detail = "café"
         ];
         let r: Result<Response, _> = codec::decode(&wire);
         assert!(r.is_err());
@@ -659,8 +666,14 @@ mod tests {
     fn rejects_non_ascii_info_fw() {
         // Info with a non-ASCII fw string -> F15 reject.
         let wire = [
-            0x86, ResponseTag::Info as u8, // array(6), Info tag
-            0x65, 0x63, 0x61, 0x66, 0xc3, 0xa9, // fw = "café"
+            0x86,
+            ResponseTag::Info as u8, // array(6), Info tag
+            0x65,
+            0x63,
+            0x61,
+            0x66,
+            0xc3,
+            0xa9, // fw = "café"
         ];
         let r: Result<Response, _> = codec::decode(&wire);
         assert!(r.is_err());
@@ -670,10 +683,20 @@ mod tests {
     fn rejects_non_ascii_sign_summary() {
         // Sign with valid alg + digest, then a non-ASCII summary -> F15 reject.
         let wire = [
-            0x84, RequestTag::Sign as u8, // array(4), Sign tag
-            0x26,     // alg = -7
-            0x82, 0x2f, 0x42, 0xAB, 0xCD, // digest = [-16, h'ABCD']
-            0x65, 0x63, 0x61, 0x66, 0xc3, 0xa9, // summary = "café"
+            0x84,
+            RequestTag::Sign as u8, // array(4), Sign tag
+            0x26,                   // alg = -7
+            0x82,
+            0x2f,
+            0x42,
+            0xAB,
+            0xCD, // digest = [-16, h'ABCD']
+            0x65,
+            0x63,
+            0x61,
+            0x66,
+            0xc3,
+            0xa9, // summary = "café"
         ];
         let r: Result<Request, _> = codec::decode(&wire);
         assert!(r.is_err());
