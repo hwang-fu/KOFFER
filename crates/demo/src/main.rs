@@ -1,4 +1,4 @@
-//! Runnable demonstration: runs the end-to-end sign/verify + seal/open flow in both crypto
+//! Runnable demonstration: runs the end-to-end sign/verify + seal/unseal flow in both crypto
 //! profiles and prints a readable trace. It uses a fixed-seed deterministic RNG, so the run
 //! is reproducible and pulls in no operating-system entropy source.
 
@@ -65,7 +65,7 @@ fn print_report(report: &RunReport) {
         "  {:<28}: {} bytes",
         "seal payload -> COSE_Encrypt", report.sealed_len
     );
-    println!("  {:<28}: {}", "open", pass(report.opened));
+    println!("  {:<28}: {}", "unseal", pass(report.unsealed));
     println!("  {:<28}: {}", "result", pass(report.ok()));
     println!();
 }

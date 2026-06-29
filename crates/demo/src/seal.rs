@@ -1,11 +1,11 @@
-//! Seal a payload with the KEM+DEM core and frame it as a `COSE_Encrypt`, then open it,
+//! Seal a payload with the KEM+DEM core and frame it as a `COSE_Encrypt`, then unseal it,
 //! with the backends selected by the integer COSE codepoint.
 //!
 //! `crypto::seal`/`unseal` are generic free functions, so -- unlike the signer -- the demo
 //! cannot hand them a boxed backend. The dispatch helpers below `match` the profile (seal
-//! side) or the wire codepoint (open side) and call `seal::<concrete>` inside each arm; the
+//! side) or the wire codepoint (unseal side) and call `seal::<concrete>` inside each arm; the
 //! flow itself never names a scheme. The KDF is not carried on the wire -- it is pinned to
-//! the KEM level (which identifies the profile), so the open side derives it from the KEM
+//! the KEM level (which identifies the profile), so the unseal side derives it from the KEM
 //! codepoint. The KEM is the hybrid X25519 + ML-KEM; the AEAD is AES-256-GCM.
 
 use crypto::aead::{Aes256Gcm, Nonce, Tag};
@@ -25,7 +25,7 @@ use sha2::{Sha256, Sha384};
 const TAG_LEN: usize = 16;
 
 /// Seals `plaintext` to a fresh recipient keypair under `profile` and frames it as an
-/// encoded `COSE_Encrypt`. Returns the encoding and the decapsulation key that opens it.
+/// encoded `COSE_Encrypt`. Returns the encoding and the decapsulation key that unseals it.
 pub fn seal_payload(
     profile: CryptoProfile,
     plaintext: &[u8],
@@ -57,7 +57,7 @@ pub fn seal_payload(
     )
 }
 
-/// Opens an encoded `COSE_Encrypt` with `decapsulation_key`, recovering the plaintext. The
+/// Unseals an encoded `COSE_Encrypt` with `decapsulation_key`, recovering the plaintext. The
 /// KEM/AEAD backends are chosen purely from the wire codepoints; `None` on any failure.
 pub fn unseal_payload(
     cose_bytes: &[u8],
@@ -192,7 +192,7 @@ mod tests {
     impl rand_core::TryCryptoRng for TestRng {}
 
     #[test]
-    fn seal_then_open_round_trips() {
+    fn seal_then_unseal_round_trips() {
         let (cose, dk) = seal_payload(CryptoProfile::Showcase, b"payload", b"ctx", &mut TestRng(1));
         assert_eq!(
             unseal_payload(&cose, &dk, b"ctx").as_deref(),

@@ -10,18 +10,18 @@ pub struct RunReport {
     pub signed_len: usize,
     pub verified: bool,
     pub sealed_len: usize,
-    pub opened: bool,
+    pub unsealed: bool,
 }
 
 impl RunReport {
-    /// Whether the full round-trip succeeded: signature verified and payload opened.
+    /// Whether the full round-trip succeeded: signature verified and payload unsealed.
     pub fn ok(&self) -> bool {
-        self.verified && self.opened
+        self.verified && self.unsealed
     }
 }
 
 /// Runs the whole flow under `profile`: build a SUIT manifest, sign and verify it, then seal
-/// and open a payload. Returns a report of each step's outcome. One code path, both profiles --
+/// and unseal a payload. Returns a report of each step's outcome. One code path, both profiles --
 /// the only switch is `profile`.
 pub fn run(profile: CryptoProfile, rng: &mut dyn rand_core::CryptoRng) -> RunReport {
     let class_id = AsciiStr::try_from("koffer-device").expect("ascii class id");
@@ -34,7 +34,7 @@ pub fn run(profile: CryptoProfile, rng: &mut dyn rand_core::CryptoRng) -> RunRep
     let payload = b"firmware image";
     let aad = b"firmware-update";
     let (sealed, decapsulation_key) = crate::seal::seal_payload(profile, payload, aad, rng);
-    let opened = crate::seal::unseal_payload(&sealed, &decapsulation_key, aad).as_deref()
+    let unsealed = crate::seal::unseal_payload(&sealed, &decapsulation_key, aad).as_deref()
         == Some(&payload[..]);
 
     RunReport {
@@ -42,6 +42,6 @@ pub fn run(profile: CryptoProfile, rng: &mut dyn rand_core::CryptoRng) -> RunRep
         signed_len: signed.len(),
         verified,
         sealed_len: sealed.len(),
-        opened,
+        unsealed,
     }
 }

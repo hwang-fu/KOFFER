@@ -1,4 +1,4 @@
-//! End-to-end integration test: the full manifest sign/verify + payload seal/open flow,
+//! End-to-end integration test: the full manifest sign/verify + payload seal/unseal flow,
 //! run in both crypto profiles, with tamper-negative cases on each path.
 
 use core::convert::Infallible;
