@@ -513,11 +513,8 @@ mod tests {
         assert_eq!(codec::encode(&decoded).expect("re-encode"), bytes); // deterministic
     }
 
-    /// Lowercase hex of the encoded bytes, for the frozen-vector comparison.
     #[cfg(feature = "alloc")]
-    fn to_hex(bytes: &[u8]) -> String {
-        bytes.iter().map(|b| format!("{b:02x}")).collect()
-    }
+    use crate::testutil::to_hex;
 
     #[cfg(feature = "alloc")]
     #[test]

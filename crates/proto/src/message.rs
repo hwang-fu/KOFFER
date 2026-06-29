@@ -694,11 +694,8 @@ mod tests {
         assert!(r.is_err());
     }
 
-    /// Lowercase hex of the encoded bytes, for the frozen-vector comparisons.
     #[cfg(feature = "alloc")]
-    fn to_hex(bytes: &[u8]) -> String {
-        bytes.iter().map(|b| format!("{b:02x}")).collect()
-    }
+    use crate::testutil::to_hex;
 
     #[cfg(feature = "alloc")]
     fn check_request_kat(msg: Request, expected_hex: &str) {

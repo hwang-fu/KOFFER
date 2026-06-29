@@ -604,11 +604,8 @@ mod tests {
         assert_eq!(tbs, expected);
     }
 
-    /// Lowercase hex, to compare against the cose-wg `ToBeSign_hex` strings.
     #[cfg(feature = "alloc")]
-    fn to_hex(bytes: &[u8]) -> String {
-        bytes.iter().map(|b| format!("{b:02x}")).collect()
-    }
+    use crate::testutil::to_hex;
 
     #[cfg(feature = "alloc")]
     #[test]
