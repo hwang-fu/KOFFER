@@ -11,6 +11,8 @@ use zeroize::Zeroize;
 pub enum BytesError {
     /// The byte sequence is longer than the buffer's maximum length `MAX`.
     TooLong { len: usize, max: usize },
+    /// An exact-length constructor received a sequence of the wrong length.
+    WrongLength { expected: usize, got: usize },
 }
 
 impl fmt::Display for BytesError {
@@ -18,6 +20,9 @@ impl fmt::Display for BytesError {
         match self {
             BytesError::TooLong { len, max } => {
                 write!(f, "byte sequence of {len} bytes exceeds the maximum of {max}")
+            }
+            BytesError::WrongLength { expected, got } => {
+                write!(f, "expected exactly {expected} bytes, got {got}")
             }
         }
     }
@@ -43,6 +48,19 @@ impl<const MAX: usize> Bytes<MAX> {
     /// Returns the contents as a byte slice.
     pub fn as_slice(&self) -> &[u8] {
         self.0.as_slice()
+    }
+
+    /// Creates a buffer that must contain exactly `MAX` bytes -- for fixed-size values
+    /// (keys, nonces, digests), where a wrong length is an error in its own right rather
+    /// than just an over-long buffer.
+    pub fn try_from_exact(bytes: &[u8]) -> Result<Self, BytesError> {
+        if bytes.len() != MAX {
+            return Err(BytesError::WrongLength {
+                expected: MAX,
+                got: bytes.len(),
+            });
+        }
+        Self::try_from(bytes) // len == MAX, so this cannot be TooLong
     }
 }
 
@@ -121,6 +139,19 @@ mod tests {
         let bytes = [0u8; 5];
         let r = Bytes::<4>::try_from(&bytes[..]);
         assert_eq!(r, Err(BytesError::TooLong { len: 5, max: 4 }));
+    }
+
+    #[test]
+    fn try_from_exact_requires_max_len() {
+        assert!(Bytes::<4>::try_from_exact(&[1, 2, 3, 4]).is_ok());
+        assert_eq!(
+            Bytes::<4>::try_from_exact(&[1, 2, 3]),
+            Err(BytesError::WrongLength { expected: 4, got: 3 })
+        );
+        assert_eq!(
+            Bytes::<4>::try_from_exact(&[1, 2, 3, 4, 5]),
+            Err(BytesError::WrongLength { expected: 4, got: 5 })
+        );
     }
 
     #[test]
