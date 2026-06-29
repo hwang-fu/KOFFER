@@ -1,6 +1,6 @@
 //! CBOR-serializable bounded byte buffers for the wire.
 
-use base::bytes::{Bytes, TooLong};
+use base::bytes::{Bytes, BytesError};
 use core::ops::Deref;
 use minicbor::encode::Write;
 
@@ -25,9 +25,9 @@ impl<const MAX: usize> CborBytes<MAX> {
 }
 
 impl<const MAX: usize> TryFrom<&[u8]> for CborBytes<MAX> {
-    type Error = TooLong;
+    type Error = BytesError;
 
-    fn try_from(bytes: &[u8]) -> Result<Self, TooLong> {
+    fn try_from(bytes: &[u8]) -> Result<Self, BytesError> {
         Bytes::try_from(bytes).map(Self)
     }
 }

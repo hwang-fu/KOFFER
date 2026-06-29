@@ -6,26 +6,24 @@ use core::ops::Deref;
 use subtle::ConstantTimeEq;
 use zeroize::Zeroize;
 
-/// Error returned when a byte sequence is longer than the buffer's maximum length `MAX`.
+/// Errors from constructing a [`Bytes`] buffer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TooLong {
-    /// Length of the rejected byte sequence.
-    pub len: usize,
-    /// Maximum length allowed.
-    pub max: usize,
+pub enum BytesError {
+    /// The byte sequence is longer than the buffer's maximum length `MAX`.
+    TooLong { len: usize, max: usize },
 }
 
-impl fmt::Display for TooLong {
+impl fmt::Display for BytesError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "byte sequence of {} bytes exceeds the maximum of {}",
-            self.len, self.max
-        )
+        match self {
+            BytesError::TooLong { len, max } => {
+                write!(f, "byte sequence of {len} bytes exceeds the maximum of {max}")
+            }
+        }
     }
 }
 
-impl core::error::Error for TooLong {}
+impl core::error::Error for BytesError {}
 
 /// A variable-length byte buffer holding at most `MAX` bytes.
 ///
@@ -49,12 +47,12 @@ impl<const MAX: usize> Bytes<MAX> {
 }
 
 impl<const MAX: usize> TryFrom<&[u8]> for Bytes<MAX> {
-    type Error = TooLong;
+    type Error = BytesError;
 
-    fn try_from(bytes: &[u8]) -> Result<Self, TooLong> {
+    fn try_from(bytes: &[u8]) -> Result<Self, BytesError> {
         heapless::Vec::from_slice(bytes)
             .map(Self)
-            .map_err(|_| TooLong {
+            .map_err(|_| BytesError::TooLong {
                 len: bytes.len(),
                 max: MAX,
             })
@@ -122,7 +120,7 @@ mod tests {
     fn rejects_over_max() {
         let bytes = [0u8; 5];
         let r = Bytes::<4>::try_from(&bytes[..]);
-        assert_eq!(r, Err(TooLong { len: 5, max: 4 }));
+        assert_eq!(r, Err(BytesError::TooLong { len: 5, max: 4 }));
     }
 
     #[test]

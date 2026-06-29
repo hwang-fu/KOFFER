@@ -37,9 +37,9 @@ macro_rules! bytes_newtype {
         }
 
         impl TryFrom<&[u8]> for $name {
-            type Error = base::bytes::TooLong;
+            type Error = base::bytes::BytesError;
 
-            fn try_from(bytes: &[u8]) -> Result<Self, base::bytes::TooLong> {
+            fn try_from(bytes: &[u8]) -> Result<Self, base::bytes::BytesError> {
                 base::bytes::Bytes::try_from(bytes).map(Self)
             }
         }
@@ -62,9 +62,9 @@ macro_rules! secret_bytes_newtype {
         }
 
         impl TryFrom<&[u8]> for $name {
-            type Error = base::bytes::TooLong;
+            type Error = base::bytes::BytesError;
 
-            fn try_from(bytes: &[u8]) -> Result<Self, base::bytes::TooLong> {
+            fn try_from(bytes: &[u8]) -> Result<Self, base::bytes::BytesError> {
                 base::bytes::Bytes::try_from(bytes).map(Self)
             }
         }
