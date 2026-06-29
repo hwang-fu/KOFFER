@@ -4,11 +4,13 @@
 //! (0x20-0x7E). Bytes outside that range are rejected at the parse boundary, never silently
 //! transcoded.
 
-use crate::codec::{Decode, DecodeError, Decoder, Encode, EncodeError, Encoder, Write};
-#[cfg(feature = "alloc")]
-use alloc::string::String;
+use minicbor::encode::Write;
+
 use core::fmt;
 use core::ops::Deref;
+
+#[cfg(feature = "alloc")]
+use alloc::string::String;
 
 /// Error returned when input contains a byte outside printable 7-bit US-ASCII (0x20-0x7E).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -83,17 +85,25 @@ impl fmt::Display for AsciiStr<'_> {
     }
 }
 
-impl<C> Encode<C> for AsciiStr<'_> {
-    fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), EncodeError<W::Error>> {
+impl<C> minicbor::Encode<C> for AsciiStr<'_> {
+    fn encode<W>(
+        &self,
+        e: &mut minicbor::Encoder<W>,
+        _: &mut C,
+    ) -> Result<(), minicbor::encode::Error<W::Error>>
+    where
+        W: Write,
+    {
         e.str(self.0)?.ok()
     }
 }
 
-impl<'b, C> Decode<'b, C> for AsciiStr<'b> {
-    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, DecodeError> {
+impl<'b, C> minicbor::Decode<'b, C> for AsciiStr<'b> {
+    fn decode(d: &mut minicbor::Decoder<'b>, _: &mut C) -> Result<Self, minicbor::decode::Error> {
         let s = d.str()?;
-        validate(s.as_bytes())
-            .map_err(|_| DecodeError::message("input is not printable 7-bit US-ASCII"))?;
+        validate(s.as_bytes()).map_err(|_| {
+            minicbor::decode::Error::message("input is not printable 7-bit US-ASCII")
+        })?;
         Ok(Self(s))
     }
 }
@@ -160,18 +170,23 @@ impl fmt::Display for AsciiString {
 }
 
 #[cfg(feature = "alloc")]
-impl<C> Encode<C> for AsciiString {
-    fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), EncodeError<W::Error>> {
+impl<C> minicbor::Encode<C> for AsciiString {
+    fn encode<W: Write>(
+        &self,
+        e: &mut minicbor::Encoder<W>,
+        _: &mut C,
+    ) -> Result<(), minicbor::encode::Error<W::Error>> {
         e.str(self.0.as_str())?.ok()
     }
 }
 
 #[cfg(feature = "alloc")]
-impl<'b, C> Decode<'b, C> for AsciiString {
-    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, DecodeError> {
+impl<'b, C> minicbor::Decode<'b, C> for AsciiString {
+    fn decode(d: &mut minicbor::Decoder<'b>, _: &mut C) -> Result<Self, minicbor::decode::Error> {
         let s = d.str()?;
-        validate(s.as_bytes())
-            .map_err(|_| DecodeError::message("input is not printable 7-bit US-ASCII"))?;
+        validate(s.as_bytes()).map_err(|_| {
+            minicbor::decode::Error::message("input is not printable 7-bit US-ASCII")
+        })?;
         Ok(Self(String::from(s)))
     }
 }
