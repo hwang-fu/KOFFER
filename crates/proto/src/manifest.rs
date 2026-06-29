@@ -11,7 +11,11 @@
 
 use minicbor::encode::Write;
 
-use crate::{alg::AlgId, ascii::AsciiStr};
+use crate::{
+    alg::AlgId,
+    ascii::AsciiStr,
+    codec::{definite_map, expect_array},
+};
 
 /// CBOR map key for each manifest field. The `#[repr(u8)]` discriminant is the
 /// on-wire label integer.
@@ -89,11 +93,7 @@ impl<C> minicbor::Encode<C> for SuitDigest<'_> {
 
 impl<'b, C> minicbor::Decode<'b, C> for SuitDigest<'b> {
     fn decode(d: &mut minicbor::Decoder<'b>, _: &mut C) -> Result<Self, minicbor::decode::Error> {
-        if d.array()? != Some(2) {
-            return Err(minicbor::decode::Error::message(
-                "SUIT digest must be a 2-element array",
-            ));
-        }
+        expect_array(d, 2, "SUIT digest must be a 2-element array")?;
         let alg = d.decode()?;
         let bytes = d.bytes()?;
         Ok(Self { alg, bytes })
@@ -263,9 +263,7 @@ impl<C> minicbor::Encode<C> for Manifest<'_> {
 
 impl<'b, C> minicbor::Decode<'b, C> for Manifest<'b> {
     fn decode(d: &mut minicbor::Decoder<'b>, _: &mut C) -> Result<Self, minicbor::decode::Error> {
-        let entries = d
-            .map()?
-            .ok_or_else(|| minicbor::decode::Error::message("manifest must be a definite map"))?;
+        let entries = definite_map(d, "manifest must be a definite map")?;
 
         let mut profile_version = None;
         let mut sequence = None;

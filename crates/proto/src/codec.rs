@@ -49,6 +49,18 @@ pub(crate) fn expect_map(
     Ok(())
 }
 
+/// Reads a definite-length CBOR map header, returning its entry count.
+///
+/// For maps whose length is not fixed and the caller loops over the entries, unlike
+/// `expect_map`, which pins an exact count. Rejects the indefinite-length form.
+pub(crate) fn definite_map(
+    d: &mut minicbor::Decoder<'_>,
+    message: &'static str,
+) -> Result<u64, minicbor::decode::Error> {
+    d.map()?
+        .ok_or_else(|| minicbor::decode::Error::message(message))
+}
+
 #[cfg(all(test, feature = "alloc"))]
 mod tests {
     use super::{decode, encode};
