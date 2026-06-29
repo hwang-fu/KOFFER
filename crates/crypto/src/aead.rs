@@ -19,8 +19,8 @@ use chacha20poly1305::ChaCha20Poly1305 as ChaChaCipher;
 
 use crate::error::AeadError;
 
-// AES-256-GCM fixed sizes. A future ChaCha20-Poly1305 backend shares all three,
-// so these bounds are exact for every AEAD this crate plans to support.
+// Fixed AEAD sizes, shared by both backends: AES-256-GCM and ChaCha20-Poly1305
+// (RFC 8439) use a 32-byte key, a 12-byte nonce, and a 16-byte tag.
 pub const KEY_LEN: usize = 32; // AES-256 key
 pub const NONCE_LEN: usize = 12; // 96-bit GCM nonce
 pub const TAG_LEN: usize = 16; // 128-bit GCM tag
