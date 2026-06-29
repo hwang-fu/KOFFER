@@ -52,6 +52,16 @@ impl CryptoProfile {
         }
     }
 
+    /// Whether `alg` is a permitted AEAD under this profile. AES-256-GCM is required by both
+    /// profiles; ChaCha20-Poly1305 is an alternative offered only by the showcase profile
+    /// (the CNSA 2.0 profile is AES-256-GCM only).
+    pub fn allows_aead(self, alg: AeadAlg) -> bool {
+        match alg {
+            AeadAlg::Aes256Gcm => true,
+            AeadAlg::ChaCha20Poly1305 => matches!(self, CryptoProfile::Showcase),
+        }
+    }
+
     /// The key-derivation function.
     pub fn kdf(self) -> KdfAlg {
         match self {
@@ -98,5 +108,18 @@ mod tests {
     #[test]
     fn default_is_showcase() {
         assert_eq!(CryptoProfile::default(), CryptoProfile::Showcase);
+    }
+
+    #[test]
+    fn aead_gating() {
+        // AES-256-GCM is required by both profiles.
+        assert!(CryptoProfile::Showcase.allows_aead(AeadAlg::Aes256Gcm));
+        assert!(CryptoProfile::Cnsa20.allows_aead(AeadAlg::Aes256Gcm));
+        // ChaCha20-Poly1305 is a showcase-only alternative.
+        assert!(CryptoProfile::Showcase.allows_aead(AeadAlg::ChaCha20Poly1305));
+        assert!(!CryptoProfile::Cnsa20.allows_aead(AeadAlg::ChaCha20Poly1305));
+        // A profile always permits the AEAD it defaults to.
+        assert!(CryptoProfile::Showcase.allows_aead(CryptoProfile::Showcase.aead()));
+        assert!(CryptoProfile::Cnsa20.allows_aead(CryptoProfile::Cnsa20.aead()));
     }
 }
