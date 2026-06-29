@@ -235,8 +235,19 @@ impl<'b, C> minicbor::Decode<'b, C> for Manifest<'b> {
         let mut version_string = None;
         let mut encrypted_digest = None;
         let mut key_ref = None;
+        // Canonical decode: map labels must be strictly ascending. This rejects both
+        // out-of-order keys and duplicate keys (an equal label fails the `>` test), so a
+        // signed manifest has exactly one valid encoding and cannot be parsed two ways.
+        let mut prev_label = 0u8;
         for _ in 0..entries {
-            match d.u8()? {
+            let label = d.u8()?;
+            if label <= prev_label {
+                return Err(minicbor::decode::Error::message(
+                    "manifest labels must be unique and strictly ascending",
+                ));
+            }
+            prev_label = label;
+            match label {
                 LABEL_VERSION => version = Some(d.u8()?),
                 LABEL_SEQUENCE => sequence = Some(d.u64()?),
                 LABEL_CLASS_ID => class_id = Some(d.decode()?),
@@ -341,6 +352,37 @@ mod tests {
             0x04, 0x82, 0x2f, 0x42, 0xAB, 0xCD, //
             0x05, 0x00, //
             0x09, 0x00, // label 9 (unknown) -> reject
+        ];
+        let r: Result<Manifest, _> = codec::decode(&wire);
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn rejects_out_of_order_labels() {
+        // sequence (label 2) precedes version (label 1); ascending order is required.
+        let wire = [
+            0xa5, // map(5)
+            0x02, 0x05, // sequence (label 2) first
+            0x01, 0x01, // version (label 1) second -> not ascending
+            0x03, 0x63, b'k', b'o', b'f', // class_id
+            0x04, 0x82, 0x2f, 0x42, 0xAB, 0xCD, // payload_digest
+            0x05, 0x00, // target_slot
+        ];
+        let r: Result<Manifest, _> = codec::decode(&wire);
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn rejects_duplicate_label() {
+        // version (label 1) appears twice; a repeated key is non-canonical.
+        let wire = [
+            0xa6, // map(6)
+            0x01, 0x01, // version = 1
+            0x01, 0x02, // version again -> duplicate
+            0x02, 0x05, // sequence
+            0x03, 0x63, b'k', b'o', b'f', // class_id
+            0x04, 0x82, 0x2f, 0x42, 0xAB, 0xCD, // payload_digest
+            0x05, 0x00, // target_slot
         ];
         let r: Result<Manifest, _> = codec::decode(&wire);
         assert!(r.is_err());
