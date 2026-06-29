@@ -22,6 +22,33 @@ where
     minicbor::decode(bytes)
 }
 
+/// Reads a definite-length CBOR array header and checks it has exactly `len` elements.
+///
+/// Rejects the indefinite-length form and any other element count, so a decoder cannot
+/// silently accept a non-canonical or wrong-shaped array. Used by the fixed-shape types.
+pub(crate) fn expect_array(
+    d: &mut minicbor::Decoder<'_>,
+    len: u64,
+    message: &'static str,
+) -> Result<(), minicbor::decode::Error> {
+    if d.array()? != Some(len) {
+        return Err(minicbor::decode::Error::message(message));
+    }
+    Ok(())
+}
+
+/// Reads a definite-length CBOR map header and checks it has exactly `len` entries.
+pub(crate) fn expect_map(
+    d: &mut minicbor::Decoder<'_>,
+    len: u64,
+    message: &'static str,
+) -> Result<(), minicbor::decode::Error> {
+    if d.map()? != Some(len) {
+        return Err(minicbor::decode::Error::message(message));
+    }
+    Ok(())
+}
+
 #[cfg(all(test, feature = "alloc"))]
 mod tests {
     use super::{decode, encode};

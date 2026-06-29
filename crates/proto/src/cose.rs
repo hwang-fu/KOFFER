@@ -7,7 +7,11 @@
 
 use minicbor::{Encode, data::Type, encode::Write, encode::write::Cursor};
 
-use crate::{alg::AlgId, ascii::AsciiStr};
+use crate::{
+    alg::AlgId,
+    ascii::AsciiStr,
+    codec::{expect_array, expect_map},
+};
 
 /// COSE header label for the algorithm identifier (RFC 9052 Table 2).
 const LABEL_ALG: u8 = 1;
@@ -254,11 +258,11 @@ impl<'b, C> minicbor::Decode<'b, C> for ProtectedHeader {
         // it, rejecting anything that is not exactly that single-entry map.
         let protected = d.bytes()?;
         let mut inner = minicbor::Decoder::new(protected);
-        if inner.map()? != Some(1) {
-            return Err(minicbor::decode::Error::message(
-                "protected header must be a definite single-entry map",
-            ));
-        }
+        expect_map(
+            &mut inner,
+            1,
+            "protected header must be a definite single-entry map",
+        )?;
         if inner.u8()? != LABEL_ALG {
             return Err(minicbor::decode::Error::message(
                 "protected header missing algorithm label",
@@ -346,11 +350,7 @@ impl<C> minicbor::Encode<C> for CoseSign1<'_> {
 
 impl<'b, C> minicbor::Decode<'b, C> for CoseSign1<'b> {
     fn decode(d: &mut minicbor::Decoder<'b>, _: &mut C) -> Result<Self, minicbor::decode::Error> {
-        if d.array()? != Some(4) {
-            return Err(minicbor::decode::Error::message(
-                "COSE_Sign1 must be a 4-element array",
-            ));
-        }
+        expect_array(d, 4, "COSE_Sign1 must be a 4-element array")?;
         let protected: ProtectedHeader = d.decode()?;
         let kid = decode_kid_header(d)?;
         let payload = if d.datatype()? == Type::Null {
@@ -405,11 +405,7 @@ impl<C> minicbor::Encode<C> for Recipient<'_> {
 
 impl<'b, C> minicbor::Decode<'b, C> for Recipient<'b> {
     fn decode(d: &mut minicbor::Decoder<'b>, _: &mut C) -> Result<Self, minicbor::decode::Error> {
-        if d.array()? != Some(3) {
-            return Err(minicbor::decode::Error::message(
-                "COSE_recipient must be a 3-element array",
-            ));
-        }
+        expect_array(d, 3, "COSE_recipient must be a 3-element array")?;
         let protected: ProtectedHeader = d.decode()?;
         let kid = decode_kid_header(d)?;
         let encapsulation = d.bytes()?;
@@ -446,18 +442,10 @@ impl<C> minicbor::Encode<C> for CoseEncrypt<'_> {
 
 impl<'b, C> minicbor::Decode<'b, C> for CoseEncrypt<'b> {
     fn decode(d: &mut minicbor::Decoder<'b>, _: &mut C) -> Result<Self, minicbor::decode::Error> {
-        if d.array()? != Some(4) {
-            return Err(minicbor::decode::Error::message(
-                "COSE_Encrypt must be a 4-element array",
-            ));
-        }
+        expect_array(d, 4, "COSE_Encrypt must be a 4-element array")?;
         let protected: ProtectedHeader = d.decode()?;
         // unprotected header: exactly {5: IV}.
-        if d.map()? != Some(1) {
-            return Err(minicbor::decode::Error::message(
-                "COSE_Encrypt unprotected header must carry the IV",
-            ));
-        }
+        expect_map(d, 1, "COSE_Encrypt unprotected header must carry the IV")?;
         if d.u8()? != LABEL_IV {
             return Err(minicbor::decode::Error::message(
                 "unexpected COSE_Encrypt header label",
@@ -466,11 +454,7 @@ impl<'b, C> minicbor::Decode<'b, C> for CoseEncrypt<'b> {
         let nonce = d.bytes()?;
         let ciphertext = d.bytes()?;
         // recipients: exactly one.
-        if d.array()? != Some(1) {
-            return Err(minicbor::decode::Error::message(
-                "COSE_Encrypt must have exactly one recipient",
-            ));
-        }
+        expect_array(d, 1, "COSE_Encrypt must have exactly one recipient")?;
         let recipient: Recipient = d.decode()?;
         Ok(Self {
             protected,
