@@ -266,6 +266,7 @@ impl<'b, C> minicbor::Decode<'b, C> for Manifest<'b> {
         let entries = d
             .map()?
             .ok_or_else(|| minicbor::decode::Error::message("manifest must be a definite map"))?;
+
         let mut profile_version = None;
         let mut sequence = None;
         let mut class_id = None;
@@ -274,6 +275,7 @@ impl<'b, C> minicbor::Decode<'b, C> for Manifest<'b> {
         let mut version_string = None;
         let mut encrypted_digest = None;
         let mut key_id = None;
+
         // Canonical decode: map labels must be strictly ascending. This rejects both
         // out-of-order keys and duplicate keys (an equal label fails the `>` test), so a
         // signed manifest has exactly one valid encoding and cannot be parsed two ways.
@@ -299,6 +301,17 @@ impl<'b, C> minicbor::Decode<'b, C> for Manifest<'b> {
                 Label::KeyId => key_id = Some(d.decode()?),
             }
         }
+
+        let profile_version = profile_version
+            .ok_or_else(|| minicbor::decode::Error::message("manifest missing profile_version"))?;
+        let sequence = sequence
+            .ok_or_else(|| minicbor::decode::Error::message("manifest missing sequence"))?;
+        let class_id = class_id
+            .ok_or_else(|| minicbor::decode::Error::message("manifest missing class_id"))?;
+        let payload_digest = payload_digest
+            .ok_or_else(|| minicbor::decode::Error::message("manifest missing payload_digest"))?;
+        let target_slot = target_slot
+            .ok_or_else(|| minicbor::decode::Error::message("manifest missing target_slot"))?;
         // The encrypted-update fields are paired: both present or both absent.
         let encrypted = match (encrypted_digest, key_id) {
             (Some(digest), Some(key_id)) => Some(Encrypted::new(digest, key_id)),
@@ -309,19 +322,13 @@ impl<'b, C> minicbor::Decode<'b, C> for Manifest<'b> {
                 ));
             }
         };
+
         Ok(Self {
-            profile_version: profile_version.ok_or_else(|| {
-                minicbor::decode::Error::message("manifest missing profile_version")
-            })?,
-            sequence: sequence
-                .ok_or_else(|| minicbor::decode::Error::message("manifest missing sequence"))?,
-            class_id: class_id
-                .ok_or_else(|| minicbor::decode::Error::message("manifest missing class_id"))?,
-            payload_digest: payload_digest.ok_or_else(|| {
-                minicbor::decode::Error::message("manifest missing payload_digest")
-            })?,
-            target_slot: target_slot
-                .ok_or_else(|| minicbor::decode::Error::message("manifest missing target_slot"))?,
+            profile_version,
+            sequence,
+            class_id,
+            payload_digest,
+            target_slot,
             version_string,
             encrypted,
         })
