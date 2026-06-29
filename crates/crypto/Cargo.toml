@@ -11,7 +11,10 @@ std = ["alloc"]
 alloc = []
 
 [dependencies]
-aes-gcm = { version = "0.10", default-features = false, features = ["aes", "zeroize"] }
+aes-gcm = { version = "0.10", default-features = false, features = [
+    "aes",
+    "zeroize",
+] }
 base = { package = "koffer-base", path = "../base" }
 chacha20poly1305 = { version = "0.10", default-features = false }
 hbs-lms = "0.1.1"
@@ -20,9 +23,16 @@ ml-dsa = { version = "0.1.1", default-features = false, features = ["zeroize"] }
 ml-kem = { version = "0.3.2", default-features = false, features = ["zeroize"] }
 rand_core = { version = "0.10", default-features = false }
 sha2 = { version = "0.10", default-features = false }
-x25519-dalek = { version = "2", default-features = false, features = ["static_secrets", "zeroize"] }
+x25519-dalek = { version = "2", default-features = false, features = [
+    "static_secrets",
+    "zeroize",
+] }
 zeroize = { version = "1.9.0", default-features = false }
 
 [dev-dependencies]
 dudect-bencher = "0.7.0"
 proptest = "1.11.0"
+
+[[bench]]
+name = "ct_decap"
+harness = false
