@@ -210,7 +210,7 @@ pub enum Response<'b> {
     /// Device capabilities and current state.
     Info {
         /// Firmware version string.
-        fw: AsciiStr<'b>,
+        firmware_version: AsciiStr<'b>,
         /// Supported signature algorithms.
         sig_algs: AlgList,
         /// Supported KEM algorithms.
@@ -262,14 +262,14 @@ impl<C> minicbor::Encode<C> for Response<'_> {
     {
         match self {
             Response::Info {
-                fw,
+                firmware_version,
                 sig_algs,
                 kem_algs,
                 keys_present,
                 entropy_healthy,
             } => {
                 e.array(6)?.u8(ResponseTag::Info as u8)?;
-                fw.encode(e, ctx)?;
+                firmware_version.encode(e, ctx)?;
                 encode_alg_list(e, sig_algs, ctx)?;
                 encode_alg_list(e, kem_algs, ctx)?;
                 e.bool(*keys_present)?.bool(*entropy_healthy)?;
@@ -322,13 +322,13 @@ impl<'b, C> minicbor::Decode<'b, C> for Response<'b> {
         match tag {
             ResponseTag::Info => {
                 expect_len(len, 6)?;
-                let fw = d.decode()?;
+                let firmware_version = d.decode()?;
                 let sig_algs = decode_alg_list(d)?;
                 let kem_algs = decode_alg_list(d)?;
                 let keys_present = d.bool()?;
                 let entropy_healthy = d.bool()?;
                 Ok(Response::Info {
-                    fw,
+                    firmware_version,
                     sig_algs,
                     kem_algs,
                     keys_present,
@@ -575,14 +575,14 @@ mod tests {
     #[cfg(feature = "alloc")]
     #[test]
     fn response_info_round_trips() {
-        let fw = AsciiStr::try_from("koffer 0.1").unwrap();
+        let firmware_version = AsciiStr::try_from("koffer 0.1").unwrap();
         let mut sig_algs = AlgList::new();
         sig_algs.push(AlgId::new(-7)).unwrap();
         let mut kem_algs = AlgList::new();
         kem_algs.push(AlgId::new(-48)).unwrap();
         kem_algs.push(AlgId::new(-49)).unwrap();
         round_trip_response(Response::Info {
-            fw,
+            firmware_version,
             sig_algs,
             kem_algs,
             keys_present: true,
@@ -767,7 +767,7 @@ mod tests {
         kem_algs.push(AlgId::new(-48)).unwrap();
         check_response_kat(
             Response::Info {
-                fw: AsciiStr::try_from("kof").unwrap(),
+                firmware_version: AsciiStr::try_from("kof").unwrap(),
                 sig_algs,
                 kem_algs,
                 keys_present: true,
@@ -850,7 +850,7 @@ mod proptests {
                 kem_algs.push(AlgId::new(a)).unwrap();
             }
             let original = Response::Info {
-                fw: AsciiStr::try_from(fw.as_str()).unwrap(),
+                firmware_version: AsciiStr::try_from(fw.as_str()).unwrap(),
                 sig_algs,
                 kem_algs,
                 keys_present,
