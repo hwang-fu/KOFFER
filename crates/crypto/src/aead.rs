@@ -1,7 +1,7 @@
 //! Authenticated encryption (AEAD) value types and the AES-256-GCM and ChaCha20-Poly1305 backends.
 //!
 //! "Authenticated encryption with associated data" gives confidentiality and
-//! tamper-detection together: `open` decrypts only if the ciphertext and the
+//! tamper-detection together: `unseal` decrypts only if the ciphertext and the
 //! associated data are exactly what `seal` produced, and otherwise fails the tag
 //! check without releasing any plaintext.
 //!
@@ -42,7 +42,7 @@ bytes_newtype! {
 
 /// An authenticated-encryption backend operating in place on a caller buffer.
 ///
-/// `seal` encrypts the buffer and returns the tag; `open` verifies the tag and
+/// `seal` encrypts the buffer and returns the tag; `unseal` verifies the tag and
 /// decrypts. The nonce is caller-supplied and MUST be unique per key -- reusing a
 /// nonce under one key breaks the security of GCM.
 pub trait Aead {
@@ -60,7 +60,7 @@ pub trait Aead {
     ///
     /// Returns `Err(AeadError::OpenFailed)` if authentication fails, leaving the
     /// buffer's contents unauthenticated and no plaintext trusted.
-    fn open(
+    fn unseal(
         &self,
         key: &Key,
         nonce: &Nonce,
@@ -102,7 +102,7 @@ fn seal_with<C: AeadInPlace + KeyInit>(
 }
 
 /// Verifies `tag` over `buffer` and `aad`, then decrypts `buffer` in place with cipher `C`.
-fn open_with<C: AeadInPlace + KeyInit>(
+fn unseal_with<C: AeadInPlace + KeyInit>(
     key: &Key,
     nonce: &Nonce,
     aad: &[u8],
@@ -141,7 +141,7 @@ impl Aead for Aes256Gcm {
         seal_with::<GcmCipher>(key, nonce, aad, buffer)
     }
 
-    fn open(
+    fn unseal(
         &self,
         key: &Key,
         nonce: &Nonce,
@@ -149,7 +149,7 @@ impl Aead for Aes256Gcm {
         buffer: &mut [u8],
         tag: &Tag,
     ) -> Result<(), AeadError> {
-        open_with::<GcmCipher>(key, nonce, aad, buffer, tag)
+        unseal_with::<GcmCipher>(key, nonce, aad, buffer, tag)
     }
 }
 
@@ -167,7 +167,7 @@ impl Aead for ChaCha20Poly1305 {
         seal_with::<ChaChaCipher>(key, nonce, aad, buffer)
     }
 
-    fn open(
+    fn unseal(
         &self,
         key: &Key,
         nonce: &Nonce,
@@ -175,7 +175,7 @@ impl Aead for ChaCha20Poly1305 {
         buffer: &mut [u8],
         tag: &Tag,
     ) -> Result<(), AeadError> {
-        open_with::<ChaChaCipher>(key, nonce, aad, buffer, tag)
+        unseal_with::<ChaChaCipher>(key, nonce, aad, buffer, tag)
     }
 }
 
@@ -190,7 +190,7 @@ mod tests {
         include_str!("../../../kat/aead/rfc8439-chacha20-poly1305.kat");
 
     // Runs the published known-answer vectors in `kat_text` against `backend`: seal must
-    // reproduce each record's ciphertext and tag, and open must recover the plaintext.
+    // reproduce each record's ciphertext and tag, and unseal must recover the plaintext.
     fn check_kat(backend: &dyn Aead, kat_text: &str) {
         let records = parse(kat_text).unwrap();
         for record in &records {
@@ -205,9 +205,11 @@ mod tests {
             assert_field(record, "ciphertext", &buffer);
             assert_field(record, "tag", tag.as_slice());
 
-            // open: verify against the published tag and decrypt back in place.
+            // unseal: verify against the published tag and decrypt back in place.
             let tag = Tag::try_from(record.field("tag").unwrap()).unwrap();
-            backend.open(&key, &nonce, aad, &mut buffer, &tag).unwrap();
+            backend
+                .unseal(&key, &nonce, aad, &mut buffer, &tag)
+                .unwrap();
             assert_eq!(buffer.as_slice(), plaintext);
         }
     }
@@ -226,7 +228,7 @@ mod tests {
     // and can cover every backend. Per-backend known-answer vectors stay separate (the CAVP
     // test above; the ChaCha20-Poly1305 vectors are added alongside it).
 
-    // seal -> open recovers the plaintext for the given key, nonce, AAD, and message.
+    // seal -> unseal recovers the plaintext for the given key, nonce, AAD, and message.
     fn check_roundtrip(
         backend: &dyn Aead,
         key: &Key,
@@ -236,7 +238,7 @@ mod tests {
     ) -> Result<(), TestCaseError> {
         let mut buffer = plaintext.to_vec();
         let tag = backend.seal(key, nonce, aad, &mut buffer).unwrap();
-        backend.open(key, nonce, aad, &mut buffer, &tag).unwrap();
+        backend.unseal(key, nonce, aad, &mut buffer, &tag).unwrap();
         prop_assert_eq!(buffer.as_slice(), plaintext);
         Ok(())
     }
@@ -270,7 +272,7 @@ mod tests {
         let (key, nonce, aad, mut buffer, tag) = seal_fixture(backend);
         buffer[0] ^= 0x01;
         assert_eq!(
-            backend.open(&key, &nonce, aad, &mut buffer, &tag),
+            backend.unseal(&key, &nonce, aad, &mut buffer, &tag),
             Err(AeadError::OpenFailed)
         );
     }
@@ -281,7 +283,7 @@ mod tests {
         bytes[0] ^= 0x01;
         let tag = Tag::try_from(&bytes[..]).unwrap();
         assert_eq!(
-            backend.open(&key, &nonce, aad, &mut buffer, &tag),
+            backend.unseal(&key, &nonce, aad, &mut buffer, &tag),
             Err(AeadError::OpenFailed)
         );
     }
@@ -289,7 +291,7 @@ mod tests {
     fn check_rejects_tampered_aad(backend: &dyn Aead) {
         let (key, nonce, _aad, mut buffer, tag) = seal_fixture(backend);
         assert_eq!(
-            backend.open(&key, &nonce, b"HEADER", &mut buffer, &tag),
+            backend.unseal(&key, &nonce, b"HEADER", &mut buffer, &tag),
             Err(AeadError::OpenFailed)
         );
     }
@@ -315,19 +317,19 @@ mod tests {
     }
 
     #[test]
-    fn open_rejects_tampered_ciphertext() {
+    fn unseal_rejects_tampered_ciphertext() {
         check_rejects_tampered_ciphertext(&Aes256Gcm);
         check_rejects_tampered_ciphertext(&ChaCha20Poly1305);
     }
 
     #[test]
-    fn open_rejects_tampered_tag() {
+    fn unseal_rejects_tampered_tag() {
         check_rejects_tampered_tag(&Aes256Gcm);
         check_rejects_tampered_tag(&ChaCha20Poly1305);
     }
 
     #[test]
-    fn open_rejects_tampered_aad() {
+    fn unseal_rejects_tampered_aad() {
         check_rejects_tampered_aad(&Aes256Gcm);
         check_rejects_tampered_aad(&ChaCha20Poly1305);
     }

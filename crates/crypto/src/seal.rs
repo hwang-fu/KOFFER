@@ -120,7 +120,7 @@ pub fn unseal<K: Kem, D: Kdf, A: Aead>(
 ) -> Result<(), SealError> {
     let shared_secret = kem.decapsulate(recipient, &sealed.kem_ciphertext)?;
     let (key, _derived_nonce) = derive_key_nonce(kdf, &shared_secret)?;
-    aead.open(&key, &sealed.nonce, aad, buffer, &sealed.tag)?;
+    aead.unseal(&key, &sealed.nonce, aad, buffer, &sealed.tag)?;
     Ok(())
 }
 
