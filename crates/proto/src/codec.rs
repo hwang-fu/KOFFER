@@ -1,9 +1,5 @@
 //! CBOR codec for koffer-proto: a thin, backend-agnostic layer over the CBOR backend.
 
-pub use minicbor::decode::Error as DecodeError;
-pub use minicbor::encode::{Error as EncodeError, Write};
-pub use minicbor::{Decode, Decoder, Encode, Encoder};
-
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 #[cfg(feature = "alloc")]
@@ -11,26 +7,26 @@ use core::convert::Infallible;
 
 /// Encode a value to a CBOR byte vector. Requires the `alloc` feature.
 #[cfg(feature = "alloc")]
-pub fn encode<T>(value: &T) -> Result<Vec<u8>, EncodeError<Infallible>>
+pub fn encode<T>(value: &T) -> Result<Vec<u8>, minicbor::encode::Error<Infallible>>
 where
-    T: Encode<()>,
+    T: minicbor::Encode<()>,
 {
     minicbor::to_vec(value)
 }
 
 /// Decode a value from CBOR bytes.
-pub fn decode<'b, T>(bytes: &'b [u8]) -> Result<T, DecodeError>
+pub fn decode<'b, T>(bytes: &'b [u8]) -> Result<T, minicbor::decode::Error>
 where
-    T: Decode<'b, ()>,
+    T: minicbor::Decode<'b, ()>,
 {
     minicbor::decode(bytes)
 }
 
 #[cfg(all(test, feature = "alloc"))]
 mod tests {
-    use super::{Decode, Encode, decode, encode};
+    use super::{decode, encode};
 
-    #[derive(Encode, Decode, Debug, PartialEq)]
+    #[derive(minicbor::Encode, minicbor::Decode, Debug, PartialEq)]
     struct Sample {
         #[n(0)]
         a: u32,
