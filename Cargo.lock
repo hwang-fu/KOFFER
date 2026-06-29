@@ -678,6 +678,7 @@ version = "0.1.0"
 dependencies = [
  "koffer-crypto",
  "koffer-proto",
+ "koffer-testutil",
  "ml-dsa",
  "rand_core 0.10.1",
  "sha2",

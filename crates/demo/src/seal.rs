@@ -169,31 +169,16 @@ fn unseal_from_codepoint(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use core::convert::Infallible;
-
-    // Deterministic counter RNG for reproducible seals in tests.
-    struct TestRng(u64);
-    impl rand_core::TryRng for TestRng {
-        type Error = Infallible;
-        fn try_next_u32(&mut self) -> Result<u32, Infallible> {
-            Ok(self.try_next_u64()? as u32)
-        }
-        fn try_next_u64(&mut self) -> Result<u64, Infallible> {
-            self.0 = self.0.wrapping_add(1);
-            Ok(self.0)
-        }
-        fn try_fill_bytes(&mut self, dst: &mut [u8]) -> Result<(), Infallible> {
-            for chunk in dst.chunks_mut(8) {
-                chunk.copy_from_slice(&self.try_next_u64()?.to_le_bytes()[..chunk.len()]);
-            }
-            Ok(())
-        }
-    }
-    impl rand_core::TryCryptoRng for TestRng {}
+    use koffer_testutil::CounterRng;
 
     #[test]
     fn seal_then_unseal_round_trips() {
-        let (cose, dk) = seal_payload(CryptoProfile::Showcase, b"payload", b"ctx", &mut TestRng(1));
+        let (cose, dk) = seal_payload(
+            CryptoProfile::Showcase,
+            b"payload",
+            b"ctx",
+            &mut CounterRng::new(1),
+        );
         assert_eq!(
             unseal_payload(&cose, &dk, b"ctx").as_deref(),
             Some(&b"payload"[..])
@@ -202,8 +187,12 @@ mod tests {
 
     #[test]
     fn tampered_container_is_rejected() {
-        let (mut cose, dk) =
-            seal_payload(CryptoProfile::Showcase, b"payload", b"ctx", &mut TestRng(1));
+        let (mut cose, dk) = seal_payload(
+            CryptoProfile::Showcase,
+            b"payload",
+            b"ctx",
+            &mut CounterRng::new(1),
+        );
         let mid = cose.len() / 2;
         cose[mid] ^= 0x01;
         assert!(unseal_payload(&cose, &dk, b"ctx").is_none());
