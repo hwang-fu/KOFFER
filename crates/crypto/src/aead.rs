@@ -13,6 +13,9 @@
 
 use aes_gcm::aead::generic_array::GenericArray;
 use aes_gcm::{AeadInPlace, Aes256Gcm as GcmCipher, KeyInit};
+// `AeadInPlace`, `KeyInit`, and `GenericArray` above come from the `aead` crate that both
+// RustCrypto AEADs re-export, so the ChaCha20-Poly1305 cipher reuses them; only the type differs.
+use chacha20poly1305::ChaCha20Poly1305 as ChaChaCipher;
 
 use crate::error::AeadError;
 
@@ -113,6 +116,65 @@ impl Aead for Aes256Gcm {
         let nonce = Self::nonce_bytes(nonce)?;
         // A wrong-length tag cannot authenticate, so it is reported as a plain
         // open failure rather than a distinct error.
+        let tag: [u8; TAG_LEN] = tag
+            .as_slice()
+            .try_into()
+            .map_err(|_| AeadError::OpenFailed)?;
+        cipher
+            .decrypt_in_place_detached(
+                GenericArray::from_slice(&nonce),
+                aad,
+                buffer,
+                GenericArray::from_slice(&tag),
+            )
+            .map_err(|_| AeadError::OpenFailed)
+    }
+}
+
+/// The ChaCha20-Poly1305 AEAD backend (RFC 8439).
+pub struct ChaCha20Poly1305;
+
+impl ChaCha20Poly1305 {
+    /// Loads the cipher from a key, mapping a wrong-length key to `MalformedKey`.
+    fn cipher(key: &Key) -> Result<ChaChaCipher, AeadError> {
+        ChaChaCipher::new_from_slice(key.as_slice()).map_err(|_| AeadError::MalformedKey)
+    }
+
+    /// Validates the nonce length and copies it into a fixed array.
+    fn nonce_bytes(nonce: &Nonce) -> Result<[u8; NONCE_LEN], AeadError> {
+        nonce
+            .as_slice()
+            .try_into()
+            .map_err(|_| AeadError::MalformedNonce)
+    }
+}
+
+impl Aead for ChaCha20Poly1305 {
+    fn seal(
+        &self,
+        key: &Key,
+        nonce: &Nonce,
+        aad: &[u8],
+        buffer: &mut [u8],
+    ) -> Result<Tag, AeadError> {
+        let cipher = Self::cipher(key)?;
+        let nonce = Self::nonce_bytes(nonce)?;
+        let tag = cipher
+            .encrypt_in_place_detached(GenericArray::from_slice(&nonce), aad, buffer)
+            .map_err(|_| AeadError::Internal)?;
+        Tag::try_from(tag.as_slice()).map_err(|_| AeadError::Internal)
+    }
+
+    fn open(
+        &self,
+        key: &Key,
+        nonce: &Nonce,
+        aad: &[u8],
+        buffer: &mut [u8],
+        tag: &Tag,
+    ) -> Result<(), AeadError> {
+        let cipher = Self::cipher(key)?;
+        let nonce = Self::nonce_bytes(nonce)?;
         let tag: [u8; TAG_LEN] = tag
             .as_slice()
             .try_into()
