@@ -6,10 +6,12 @@
 //! Text fields are printable-ASCII (F15); byte fields borrow the input, zero-copy, like
 //! the COSE and manifest types.
 
+use minicbor::Encode;
+use minicbor::encode::Write;
+
 use crate::{
     alg::AlgId,
     ascii::AsciiStr,
-    codec::{Decode, DecodeError, Decoder, Encode, EncodeError, Encoder, Write},
     cose::CoseSign1,
     error::ErrorCode,
     manifest::{Manifest, SuitDigest},
@@ -69,12 +71,15 @@ pub enum Request<'b> {
     Attest { nonce: &'b [u8] },
 }
 
-impl<C> Encode<C> for Request<'_> {
-    fn encode<W: Write>(
+impl<C> minicbor::Encode<C> for Request<'_> {
+    fn encode<W>(
         &self,
-        e: &mut Encoder<W>,
+        e: &mut minicbor::Encoder<W>,
         ctx: &mut C,
-    ) -> Result<(), EncodeError<W::Error>> {
+    ) -> Result<(), minicbor::encode::Error<W::Error>>
+    where
+        W: Write,
+    {
         match self {
             Request::Handshake { payload } => {
                 e.array(2)?.u8(REQ_HANDSHAKE)?;
@@ -117,11 +122,11 @@ impl<C> Encode<C> for Request<'_> {
     }
 }
 
-impl<'b, C> Decode<'b, C> for Request<'b> {
-    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, DecodeError> {
+impl<'b, C> minicbor::Decode<'b, C> for Request<'b> {
+    fn decode(d: &mut minicbor::Decoder<'b>, _: &mut C) -> Result<Self, minicbor::decode::Error> {
         let len = d
             .array()?
-            .ok_or_else(|| DecodeError::message("request must be a definite array"))?;
+            .ok_or_else(|| minicbor::decode::Error::message("request must be a definite array"))?;
         match d.u8()? {
             REQ_HANDSHAKE => {
                 expect_len(len, 2)?;
@@ -165,7 +170,7 @@ impl<'b, C> Decode<'b, C> for Request<'b> {
                 let nonce = d.bytes()?;
                 Ok(Request::Attest { nonce })
             }
-            _ => Err(DecodeError::message("unknown request tag")),
+            _ => Err(minicbor::decode::Error::message("unknown request tag")),
         }
     }
 }
@@ -217,12 +222,15 @@ pub enum Response<'b> {
     },
 }
 
-impl<C> Encode<C> for Response<'_> {
-    fn encode<W: Write>(
+impl<C> minicbor::Encode<C> for Response<'_> {
+    fn encode<W>(
         &self,
-        e: &mut Encoder<W>,
+        e: &mut minicbor::Encoder<W>,
         ctx: &mut C,
-    ) -> Result<(), EncodeError<W::Error>> {
+    ) -> Result<(), minicbor::encode::Error<W::Error>>
+    where
+        W: Write,
+    {
         match self {
             Response::Info {
                 fw,
@@ -275,11 +283,11 @@ impl<C> Encode<C> for Response<'_> {
     }
 }
 
-impl<'b, C> Decode<'b, C> for Response<'b> {
-    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, DecodeError> {
+impl<'b, C> minicbor::Decode<'b, C> for Response<'b> {
+    fn decode(d: &mut minicbor::Decoder<'b>, _: &mut C) -> Result<Self, minicbor::decode::Error> {
         let len = d
             .array()?
-            .ok_or_else(|| DecodeError::message("response must be a definite array"))?;
+            .ok_or_else(|| minicbor::decode::Error::message("response must be a definite array"))?;
         match d.u8()? {
             RESP_INFO => {
                 expect_len(len, 6)?;
@@ -334,26 +342,31 @@ impl<'b, C> Decode<'b, C> for Response<'b> {
                 let detail = d.decode()?;
                 Ok(Response::Error { code, detail })
             }
-            _ => Err(DecodeError::message("unknown response tag")),
+            _ => Err(minicbor::decode::Error::message("unknown response tag")),
         }
     }
 }
 
 /// Checks that a tagged message's array length matches the variant's arity.
-fn expect_len(actual: u64, expected: u64) -> Result<(), DecodeError> {
+fn expect_len(actual: u64, expected: u64) -> Result<(), minicbor::decode::Error> {
     if actual == expected {
         Ok(())
     } else {
-        Err(DecodeError::message("message array has the wrong length"))
+        Err(minicbor::decode::Error::message(
+            "message array has the wrong length",
+        ))
     }
 }
 
 /// Encodes an algorithm list as a definite CBOR array of identifiers.
-fn encode_alg_list<C, W: Write>(
-    e: &mut Encoder<W>,
+fn encode_alg_list<C, W>(
+    e: &mut minicbor::Encoder<W>,
     list: &AlgList,
     ctx: &mut C,
-) -> Result<(), EncodeError<W::Error>> {
+) -> Result<(), minicbor::encode::Error<W::Error>>
+where
+    W: Write,
+{
     e.array(list.len() as u64)?;
     for alg in list {
         alg.encode(e, ctx)?;
@@ -362,15 +375,15 @@ fn encode_alg_list<C, W: Write>(
 }
 
 /// Decodes a definite CBOR array of algorithm identifiers, rejecting overflow past `MAX_ALGS`.
-fn decode_alg_list(d: &mut Decoder<'_>) -> Result<AlgList, DecodeError> {
-    let len = d
-        .array()?
-        .ok_or_else(|| DecodeError::message("algorithm list must be a definite array"))?;
+fn decode_alg_list(d: &mut minicbor::Decoder<'_>) -> Result<AlgList, minicbor::decode::Error> {
+    let len = d.array()?.ok_or_else(|| {
+        minicbor::decode::Error::message("algorithm list must be a definite array")
+    })?;
     let mut list = AlgList::new();
     for _ in 0..len {
         let alg: AlgId = d.decode()?;
         list.push(alg)
-            .map_err(|_| DecodeError::message("too many algorithms in list"))?;
+            .map_err(|_| minicbor::decode::Error::message("too many algorithms in list"))?;
     }
     Ok(list)
 }
@@ -444,7 +457,7 @@ mod tests {
         for i in 0..=MAX_ALGS {
             wire[1 + i] = i as u8;
         }
-        let mut d = Decoder::new(&wire);
+        let mut d = minicbor::Decoder::new(&wire);
         assert!(decode_alg_list(&mut d).is_err());
     }
 
