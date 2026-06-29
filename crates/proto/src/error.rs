@@ -1,6 +1,6 @@
 //! Protocol error codes.
 
-use crate::codec::{Decode, DecodeError, Decoder, Encode, EncodeError, Encoder, Write};
+use minicbor::encode::Write;
 
 /// A protocol or parse error code, carried in the wire `Error` reply.
 ///
@@ -59,14 +59,21 @@ impl From<u32> for ErrorCode {
     }
 }
 
-impl<C> Encode<C> for ErrorCode {
-    fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), EncodeError<W::Error>> {
+impl<C> minicbor::Encode<C> for ErrorCode {
+    fn encode<W>(
+        &self,
+        e: &mut minicbor::Encoder<W>,
+        _: &mut C,
+    ) -> Result<(), minicbor::encode::Error<W::Error>>
+    where
+        W: Write,
+    {
         e.u32(self.codepoint())?.ok()
     }
 }
 
-impl<'b, C> Decode<'b, C> for ErrorCode {
-    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, DecodeError> {
+impl<'b, C> minicbor::Decode<'b, C> for ErrorCode {
+    fn decode(d: &mut minicbor::Decoder<'b>, _: &mut C) -> Result<Self, minicbor::decode::Error> {
         Ok(Self::from(d.u32()?))
     }
 }
