@@ -13,14 +13,37 @@ use minicbor::encode::Write;
 
 use crate::{alg::AlgId, ascii::AsciiStr};
 
-const LABEL_VERSION: u8 = 1;
-const LABEL_SEQUENCE: u8 = 2;
-const LABEL_CLASS_ID: u8 = 3;
-const LABEL_PAYLOAD_DIGEST: u8 = 4;
-const LABEL_TARGET_SLOT: u8 = 5;
-const LABEL_VERSION_STRING: u8 = 6;
-const LABEL_ENCRYPTED_DIGEST: u8 = 7;
-const LABEL_KEY_REF: u8 = 8;
+/// CBOR map key for each manifest field. The `#[repr(u8)]` discriminant is the
+/// on-wire label integer.
+#[repr(u8)]
+enum Label {
+    Version = 1,
+    Sequence = 2,
+    ClassId = 3,
+    PayloadDigest = 4,
+    TargetSlot = 5,
+    VersionString = 6,
+    EncryptedDigest = 7,
+    KeyRef = 8,
+}
+
+impl TryFrom<u8> for Label {
+    type Error = ();
+
+    fn try_from(label: u8) -> Result<Self, ()> {
+        Ok(match label {
+            1 => Label::Version,
+            2 => Label::Sequence,
+            3 => Label::ClassId,
+            4 => Label::PayloadDigest,
+            5 => Label::TargetSlot,
+            6 => Label::VersionString,
+            7 => Label::EncryptedDigest,
+            8 => Label::KeyRef,
+            _ => return Err(()),
+        })
+    }
+}
 
 /// A SUIT-style digest: the hash algorithm plus the digest bytes (`[alg, bstr]`).
 ///
@@ -216,21 +239,21 @@ impl<C> minicbor::Encode<C> for Manifest<'_> {
             5 + self.version_string.is_some() as u64 + 2 * self.encrypted.is_some() as u64;
         e.map(entries)?;
         // ascending label order (canonical, so the signed bytes are stable).
-        e.u8(LABEL_VERSION)?.u8(self.version)?;
-        e.u8(LABEL_SEQUENCE)?.u64(self.sequence)?;
-        e.u8(LABEL_CLASS_ID)?;
+        e.u8(Label::Version as u8)?.u8(self.version)?;
+        e.u8(Label::Sequence as u8)?.u64(self.sequence)?;
+        e.u8(Label::ClassId as u8)?;
         self.class_id.encode(e, ctx)?;
-        e.u8(LABEL_PAYLOAD_DIGEST)?;
+        e.u8(Label::PayloadDigest as u8)?;
         self.payload_digest.encode(e, ctx)?;
-        e.u8(LABEL_TARGET_SLOT)?.u8(self.target_slot)?;
+        e.u8(Label::TargetSlot as u8)?.u8(self.target_slot)?;
         if let Some(version_string) = self.version_string {
-            e.u8(LABEL_VERSION_STRING)?;
+            e.u8(Label::VersionString as u8)?;
             version_string.encode(e, ctx)?;
         }
         if let Some(encrypted) = self.encrypted {
-            e.u8(LABEL_ENCRYPTED_DIGEST)?;
+            e.u8(Label::EncryptedDigest as u8)?;
             encrypted.digest.encode(e, ctx)?;
-            e.u8(LABEL_KEY_REF)?;
+            e.u8(Label::KeyRef as u8)?;
             encrypted.key_ref.encode(e, ctx)?;
         }
         Ok(())
@@ -262,16 +285,17 @@ impl<'b, C> minicbor::Decode<'b, C> for Manifest<'b> {
                 ));
             }
             prev_label = label;
+            let label = Label::try_from(label)
+                .map_err(|_| minicbor::decode::Error::message("unknown manifest label"))?;
             match label {
-                LABEL_VERSION => version = Some(d.u8()?),
-                LABEL_SEQUENCE => sequence = Some(d.u64()?),
-                LABEL_CLASS_ID => class_id = Some(d.decode()?),
-                LABEL_PAYLOAD_DIGEST => payload_digest = Some(d.decode()?),
-                LABEL_TARGET_SLOT => target_slot = Some(d.u8()?),
-                LABEL_VERSION_STRING => version_string = Some(d.decode()?),
-                LABEL_ENCRYPTED_DIGEST => encrypted_digest = Some(d.decode()?),
-                LABEL_KEY_REF => key_ref = Some(d.decode()?),
-                _ => return Err(minicbor::decode::Error::message("unknown manifest label")),
+                Label::Version => version = Some(d.u8()?),
+                Label::Sequence => sequence = Some(d.u64()?),
+                Label::ClassId => class_id = Some(d.decode()?),
+                Label::PayloadDigest => payload_digest = Some(d.decode()?),
+                Label::TargetSlot => target_slot = Some(d.u8()?),
+                Label::VersionString => version_string = Some(d.decode()?),
+                Label::EncryptedDigest => encrypted_digest = Some(d.decode()?),
+                Label::KeyRef => key_ref = Some(d.decode()?),
             }
         }
         // The encrypted-update fields are paired: both present or both absent.
