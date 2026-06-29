@@ -2,13 +2,11 @@
 //! proving the trait seam composes end to end before any real scheme exists.
 //! The whole module is test-only.
 
-use core::convert::Infallible;
-
 use crate::error::{KemError, SignError, VerifyError};
 use crate::kem::{Ciphertext, DecapsulationKey, EncapsulationKey, Kem, SharedSecret};
 use crate::profile::CryptoProfile;
 use crate::sign::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
-use rand_core::{TryCryptoRng, TryRng};
+use koffer_testutil::TestRng;
 
 /// A stand-in backend: no real cryptography, just enough for a roundtrip.
 struct Mock;
@@ -59,32 +57,6 @@ impl Kem for Mock {
     }
 }
 
-/// A deterministic counter RNG -- enough to satisfy `CryptoRng` in tests.
-struct CounterRng(u64);
-
-impl TryRng for CounterRng {
-    type Error = Infallible;
-
-    fn try_next_u32(&mut self) -> Result<u32, Infallible> {
-        Ok(self.try_next_u64()? as u32)
-    }
-
-    fn try_next_u64(&mut self) -> Result<u64, Infallible> {
-        self.0 = self.0.wrapping_add(1);
-        Ok(self.0)
-    }
-
-    fn try_fill_bytes(&mut self, dst: &mut [u8]) -> Result<(), Infallible> {
-        for chunk in dst.chunks_mut(8) {
-            let value = self.try_next_u64()?.to_le_bytes();
-            chunk.copy_from_slice(&value[..chunk.len()]);
-        }
-        Ok(())
-    }
-}
-
-impl TryCryptoRng for CounterRng {}
-
 #[test]
 fn seam_composes_end_to_end() {
     let backend = Mock;
@@ -108,7 +80,7 @@ fn seam_composes_end_to_end() {
     );
 
     // Encapsulate / decapsulate: both sides agree on the shared secret.
-    let mut rng = CounterRng(0);
+    let mut rng = TestRng::new(0);
     let ek = EncapsulationKey::try_from(&[0u8; 4][..]).unwrap();
     let dk = DecapsulationKey::try_from(&[0u8; 4][..]).unwrap();
     let (ciphertext, secret) = backend.encapsulate(&ek, &mut rng).unwrap();
