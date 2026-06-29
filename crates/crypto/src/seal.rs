@@ -132,34 +132,11 @@ mod tests {
     use crate::kat::{assert_field, parse};
     use crate::kdf::Hkdf;
     use crate::mlkem::MlKem;
-    use core::convert::Infallible;
-    use rand_core::{TryCryptoRng, TryRng};
+    use koffer_testutil::CounterRng;
     use sha2::{Sha256, Sha384};
 
     /// Fixed entropy for keygen (>= 64 bytes for ML-KEM, >= 96 for hybrid).
     const ENTROPY: [u8; 96] = [0x07; 96];
-
-    /// Deterministic counter RNG (round-trips do not depend on the RNG value).
-    struct TestRng(u64);
-
-    impl TryRng for TestRng {
-        type Error = Infallible;
-        fn try_next_u32(&mut self) -> Result<u32, Infallible> {
-            Ok(self.try_next_u64()? as u32)
-        }
-        fn try_next_u64(&mut self) -> Result<u64, Infallible> {
-            self.0 = self.0.wrapping_add(1);
-            Ok(self.0)
-        }
-        fn try_fill_bytes(&mut self, dst: &mut [u8]) -> Result<(), Infallible> {
-            for chunk in dst.chunks_mut(8) {
-                let value = self.try_next_u64()?.to_le_bytes();
-                chunk.copy_from_slice(&value[..chunk.len()]);
-            }
-            Ok(())
-        }
-    }
-    impl TryCryptoRng for TestRng {}
 
     /// `seal -> unseal` recovers the exact plaintext, for any KEM/KDF/AEAD combo.
     fn roundtrip<K: Kem, D: Kdf, A: Aead>(
@@ -171,7 +148,7 @@ mod tests {
     ) {
         let plaintext = [0xABu8; 40];
         let aad = b"koffer seal roundtrip";
-        let mut rng = TestRng(0);
+        let mut rng = CounterRng::new(0);
         let mut buffer = plaintext;
 
         let sealed = seal(kem, kdf, aead, ek, aad, &mut buffer, &mut rng).expect("seal");
@@ -221,7 +198,7 @@ mod tests {
 
         let plaintext = [0xABu8; 32];
         let aad = b"ctx";
-        let mut rng = TestRng(0);
+        let mut rng = CounterRng::new(0);
         let mut ciphertext = plaintext;
         let sealed = seal(&kem, &kdf, &aead, &ek, aad, &mut ciphertext, &mut rng).unwrap();
 
@@ -270,7 +247,7 @@ mod tests {
 
         let plaintext = [0xABu8; 32];
         let aad = b"ctx";
-        let mut rng = TestRng(0);
+        let mut rng = CounterRng::new(0);
         let mut buf = plaintext;
         let sealed = seal(&kem, &kdf, &aead, &ek, aad, &mut buf, &mut rng).unwrap();
 
@@ -300,7 +277,7 @@ mod tests {
                 let plaintext = record.field("plaintext").unwrap();
                 let aad = record.field("aad").unwrap();
                 let mut buffer = plaintext.to_vec();
-                let mut rng = TestRng(0);
+                let mut rng = CounterRng::new(0);
                 let sealed = seal(&kem, &kdf, &aead, &ek, aad, &mut buffer, &mut rng).unwrap();
                 assert_field(record, "kem_ciphertext", sealed.kem_ciphertext.as_slice());
                 assert_field(record, "nonce", sealed.nonce.as_slice());
