@@ -1,6 +1,6 @@
 //! Algorithm identifiers carried on the wire.
 
-use crate::codec::{Decode, DecodeError, Decoder, Encode, EncodeError, Encoder, Write};
+use minicbor::encode::Write;
 
 /// A COSE algorithm identifier (codepoint), carried opaquely.
 ///
@@ -25,14 +25,21 @@ impl From<i64> for AlgId {
     }
 }
 
-impl<C> Encode<C> for AlgId {
-    fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), EncodeError<W::Error>> {
+impl<C> minicbor::Encode<C> for AlgId {
+    fn encode<W>(
+        &self,
+        e: &mut minicbor::Encoder<W>,
+        _: &mut C,
+    ) -> Result<(), minicbor::encode::Error<W::Error>>
+    where
+        W: Write,
+    {
         e.i64(self.0)?.ok()
     }
 }
 
-impl<'b, C> Decode<'b, C> for AlgId {
-    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, DecodeError> {
+impl<'b, C> minicbor::Decode<'b, C> for AlgId {
+    fn decode(d: &mut minicbor::Decoder<'b>, _: &mut C) -> Result<Self, minicbor::decode::Error> {
         Ok(Self::new(d.i64()?))
     }
 }
