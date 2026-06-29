@@ -665,6 +665,7 @@ dependencies = [
  "ml-dsa",
  "ml-kem",
  "proptest",
+ "rand 0.10.1",
  "rand_core 0.10.1",
  "sha2",
  "x25519-dalek",
