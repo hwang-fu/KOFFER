@@ -7,10 +7,11 @@ edition = "2024"
 rust-version = "1.96"
 repository = "https://github.com/hwang-fu/KOFFER"
 
-# Optimize only the crypto crates that run hot in tests: the hash primitives, the
+# Bump only the crates whose unoptimized runtime makes tests crawl: the hash primitives, the
 # hash-based-signature backend, and the lattice signature/KEM backends do heavy per-operation
-# work that is unbearably slow unoptimized. Everything else (proptest, proc-macros, CBOR,
-# ...) stays at the default dev opt-level so it compiles fast and the cached target stays small.
+# math. The rest (proptest, proc-macros, CBOR, ...) are not runtime-hot, so optimizing them
+# would not speed the tests in any meaningful way -- it would only slow the build, for no gain.
+# Dev-only: release optimizes every crate regardless, so none of this affects the firmware.
 [profile.dev.package.sha2]
 opt-level = 3
 [profile.dev.package.hbs-lms]
