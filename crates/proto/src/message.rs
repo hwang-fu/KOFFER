@@ -237,8 +237,8 @@ pub enum Response<'b> {
     BootDecision {
         /// Whether the image was accepted and booted.
         image_is_accepted: bool,
-        /// A measurement of the installed image.
-        measurement: &'b [u8],
+        /// A digest of the installed image, as evidence of what was installed.
+        image_digest: &'b [u8],
     },
     /// A signed attestation over the challenge nonce (the `Attest` reply).
     Attestation(CoseSign1<'b>),
@@ -292,11 +292,11 @@ impl<C> minicbor::Encode<C> for Response<'_> {
             }
             Response::BootDecision {
                 image_is_accepted,
-                measurement,
+                image_digest,
             } => {
                 e.array(3)?.u8(ResponseTag::BootDecision as u8)?;
                 e.bool(*image_is_accepted)?;
-                e.bytes(measurement)?;
+                e.bytes(image_digest)?;
             }
             Response::Attestation(att) => {
                 e.array(2)?.u8(ResponseTag::Attestation as u8)?;
@@ -356,10 +356,10 @@ impl<'b, C> minicbor::Decode<'b, C> for Response<'b> {
             ResponseTag::BootDecision => {
                 expect_len(len, 3)?;
                 let image_is_accepted = d.bool()?;
-                let measurement = d.bytes()?;
+                let image_digest = d.bytes()?;
                 Ok(Response::BootDecision {
                     image_is_accepted,
-                    measurement,
+                    image_digest,
                 })
             }
             ResponseTag::Attestation => {
@@ -630,10 +630,10 @@ mod tests {
     #[cfg(feature = "alloc")]
     #[test]
     fn response_boot_decision_round_trips() {
-        let measurement = [0x77u8; 32];
+        let image_digest = [0x77u8; 32];
         round_trip_response(Response::BootDecision {
             image_is_accepted: true,
-            measurement: &measurement,
+            image_digest: &image_digest,
         });
     }
 
@@ -800,7 +800,7 @@ mod tests {
         check_response_kat(
             Response::BootDecision {
                 image_is_accepted: true,
-                measurement: &meas,
+                image_digest: &meas,
             },
             "8304f5427788",
         );
