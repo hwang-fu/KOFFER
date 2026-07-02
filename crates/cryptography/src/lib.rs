@@ -20,71 +20,6 @@
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
-/// Defines a byte-backed crypto value: a distinct newtype over `koffer_common::Bytes<MAX>`,
-/// constructed from a length-checked byte slice and -- via `koffer_common::Bytes` -- compared
-/// in constant time. Used for the value types in `sign` and `kem`.
-macro_rules! bytes_newtype {
-    ($(#[$attr:meta])* $name:ident, $max:ident) => {
-        $(#[$attr])*
-        #[derive(Debug, Clone, PartialEq, Eq)]
-        pub struct $name(koffer_common::bytes::Bytes<$max>);
-
-        impl $name {
-            /// Returns the value's bytes.
-            pub fn as_slice(&self) -> &[u8] {
-                self.0.as_slice()
-            }
-        }
-
-        impl TryFrom<&[u8]> for $name {
-            type Error = koffer_common::bytes::BytesError;
-
-            fn try_from(bytes: &[u8]) -> Result<Self, koffer_common::bytes::BytesError> {
-                koffer_common::bytes::Bytes::try_from(bytes).map(Self)
-            }
-        }
-    };
-}
-
-/// Like `bytes_newtype!`, but for secret material: the value wipes its bytes on drop,
-/// and its `Debug` is redacted so the secret never reaches a log or panic message.
-macro_rules! secret_bytes_newtype {
-    ($(#[$attr:meta])* $name:ident, $max:ident) => {
-        $(#[$attr])*
-        #[derive(Clone, PartialEq, Eq)]
-        pub struct $name(koffer_common::bytes::Bytes<$max>);
-
-        impl $name {
-            /// Returns the value's bytes.
-            pub fn as_slice(&self) -> &[u8] {
-                self.0.as_slice()
-            }
-        }
-
-        impl TryFrom<&[u8]> for $name {
-            type Error = koffer_common::bytes::BytesError;
-
-            fn try_from(bytes: &[u8]) -> Result<Self, koffer_common::bytes::BytesError> {
-                koffer_common::bytes::Bytes::try_from(bytes).map(Self)
-            }
-        }
-
-        impl core::fmt::Debug for $name {
-            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                // Redacted: print only the type name, never the secret bytes.
-                f.debug_struct(stringify!($name)).finish_non_exhaustive()
-            }
-        }
-
-        impl Drop for $name {
-            fn drop(&mut self) {
-                use zeroize::Zeroize;
-                self.0.zeroize();
-            }
-        }
-    };
-}
-
 pub mod aead;
 pub mod alg;
 pub mod error;
@@ -108,13 +43,15 @@ mod mock;
 
 #[cfg(test)]
 mod tests {
+    use koffer_common::bytes::Bytes;
+    use koffer_derive::{ByteNewtype, SecretByteNewtype};
+
     const TEST_MAX: usize = 4;
 
-    bytes_newtype! {
-        /// Throwaway value type, defined only to exercise the `bytes_newtype!` macro
-        /// that the real `sign` / `kem` value types are all generated from.
-        TestValue, TEST_MAX
-    }
+    /// Throwaway value type, defined only to exercise the `ByteNewtype` derive that the
+    /// real `sign` / `kem` value types all use.
+    #[derive(Debug, Clone, PartialEq, Eq, ByteNewtype)]
+    struct TestValue(Bytes<TEST_MAX>);
 
     #[test]
     fn constructs_from_bytes_and_reads_back() {
@@ -128,11 +65,10 @@ mod tests {
         assert!(TestValue::try_from(&over[..]).is_err());
     }
 
-    secret_bytes_newtype! {
-        /// Throwaway secret type, defined only to exercise the `secret_bytes_newtype!`
-        /// macro that the real secret value types are generated from.
-        SecretTestValue, TEST_MAX
-    }
+    /// Throwaway secret type, defined only to exercise the `SecretByteNewtype` derive
+    /// that the real secret value types all use.
+    #[derive(Clone, PartialEq, Eq, SecretByteNewtype)]
+    struct SecretTestValue(Bytes<TEST_MAX>);
 
     #[test]
     fn secret_debug_is_redacted() {
