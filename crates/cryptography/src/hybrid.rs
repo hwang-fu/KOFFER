@@ -67,7 +67,7 @@ fn split_last_32(bytes: &[u8]) -> Option<(&[u8], [u8; 32])> {
 
 /// Concatenates `head || tail` into `buf`, returning the filled slice (or
 /// `Internal` if the buffer is too small).
-fn join<'b>(buf: &'b mut [u8], head: &[u8], tail: &[u8; 32]) -> Result<&'b [u8], KemError> {
+fn concat<'b>(buf: &'b mut [u8], head: &[u8], tail: &[u8; 32]) -> Result<&'b [u8], KemError> {
     let n = head.len() + tail.len();
     {
         let out = buf.get_mut(..n).ok_or(KemError::Internal)?;
@@ -85,7 +85,7 @@ where
     for<'a> T: TryFrom<&'a [u8]>,
 {
     let mut buf = [0u8; JOIN_MAX];
-    let joined = join(&mut buf, head, tail)
+    let joined = concat(&mut buf, head, tail)
         .and_then(|bytes| T::try_from(bytes).map_err(|_| KemError::Internal));
     buf.zeroize();
     joined
