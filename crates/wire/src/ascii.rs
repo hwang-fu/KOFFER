@@ -12,9 +12,12 @@ use minicbor::encode::Write;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AsciiError;
 
+/// The rejection message, shared by the `Display` impl and the CBOR decoder.
+const NOT_PRINTABLE_ASCII: &str = "input is not printable 7-bit US-ASCII";
+
 impl fmt::Display for AsciiError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("input is not printable 7-bit US-ASCII")
+        f.write_str(NOT_PRINTABLE_ASCII)
     }
 }
 
@@ -97,9 +100,8 @@ impl<C> minicbor::Encode<C> for AsciiStr<'_> {
 impl<'b, C> minicbor::Decode<'b, C> for AsciiStr<'b> {
     fn decode(d: &mut minicbor::Decoder<'b>, _: &mut C) -> Result<Self, minicbor::decode::Error> {
         let s = d.str()?;
-        validate(s.as_bytes()).map_err(|_| {
-            minicbor::decode::Error::message("input is not printable 7-bit US-ASCII")
-        })?;
+        validate(s.as_bytes())
+            .map_err(|_| minicbor::decode::Error::message(NOT_PRINTABLE_ASCII))?;
         Ok(Self(s))
     }
 }
