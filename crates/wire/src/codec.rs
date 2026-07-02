@@ -73,6 +73,20 @@ pub(crate) fn definite_array(
         .ok_or_else(|| minicbor::decode::Error::message(message))
 }
 
+/// Checks that an already-read array length equals the expected element count.
+///
+/// The counterpart to `expect_array` for callers that read the length header
+/// themselves -- for example, to branch on the leading tag -- before checking it.
+pub(crate) fn expect_len(actual: u64, expected: u64) -> Result<(), minicbor::decode::Error> {
+    if actual == expected {
+        Ok(())
+    } else {
+        Err(minicbor::decode::Error::message(
+            "array has the wrong length",
+        ))
+    }
+}
+
 #[cfg(all(test, feature = "alloc"))]
 mod tests {
     use super::{decode, encode};

@@ -11,7 +11,7 @@ use minicbor::{Encode, encode::Write};
 use crate::{
     alg::AlgId,
     ascii::AsciiStr,
-    codec::definite_array,
+    codec::{definite_array, expect_len},
     cose::{CoseEncrypt, CoseSign1},
     error::ErrorCode,
     manifest::{Manifest, SuitDigest},
@@ -371,17 +371,6 @@ impl<'b, C> minicbor::Decode<'b, C> for Response<'b> {
                 Ok(Response::Error { code, detail })
             }
         }
-    }
-}
-
-/// Checks that a tagged message's array length matches the variant's arity.
-fn expect_len(actual: u64, expected: u64) -> Result<(), minicbor::decode::Error> {
-    if actual == expected {
-        Ok(())
-    } else {
-        Err(minicbor::decode::Error::message(
-            "message array has the wrong length",
-        ))
     }
 }
 

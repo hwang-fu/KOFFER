@@ -1,7 +1,7 @@
 //! Error types for the crate's cryptographic operations.
 //!
 //! Each operation -- signing, verifying, and key-exchange -- has its own error
-//! enum that lists only the cases that operation can produce. The enums are
+//! enum that lists only the cases that operation can produce. Most are
 //! marked non-exhaustive, because more cases may be added as the concrete
 //! algorithm backends land; code that matches on them must keep a catch-all arm.
 
@@ -92,4 +92,35 @@ pub enum KdfError {
     InvalidOutputLength,
     /// The requested algorithm is not built into this device.
     UnsupportedAlgorithm,
+}
+
+/// An error from sealing or unsealing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SealError {
+    /// The KEM step failed (malformed key or ciphertext).
+    Kem(KemError),
+    /// The KDF step failed.
+    Kdf(KdfError),
+    /// The AEAD step failed; `Aead(AeadError::UnsealFailed)` means tampering or the wrong key.
+    Aead(AeadError),
+    /// An internal invariant was violated (should not happen).
+    Internal,
+}
+
+impl From<KemError> for SealError {
+    fn from(e: KemError) -> Self {
+        SealError::Kem(e)
+    }
+}
+
+impl From<KdfError> for SealError {
+    fn from(e: KdfError) -> Self {
+        SealError::Kdf(e)
+    }
+}
+
+impl From<AeadError> for SealError {
+    fn from(e: AeadError) -> Self {
+        SealError::Aead(e)
+    }
 }
