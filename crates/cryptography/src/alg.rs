@@ -8,35 +8,38 @@
 
 /// A supported signature algorithm.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(i32)]
 pub enum SigAlg {
     /// HSS/LMS hash-based signatures, SHA-256.
-    HssLmsSha256,
+    HssLmsSha256 = COSE_HSS_LMS,
     /// ML-DSA-65 lattice signatures.
-    MlDsa65,
+    MlDsa65 = COSE_ML_DSA_65,
     /// ML-DSA-87 lattice signatures.
-    MlDsa87,
+    MlDsa87 = COSE_ML_DSA_87,
 }
 
 /// A supported key-encapsulation (KEM) algorithm.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(i32)]
 pub enum KemAlg {
     /// ML-KEM-768.
-    MlKem768,
+    MlKem768 = COSE_ML_KEM_768,
     /// ML-KEM-1024.
-    MlKem1024,
+    MlKem1024 = COSE_ML_KEM_1024,
     /// Hybrid X25519 + ML-KEM-768.
-    X25519MlKem768,
+    X25519MlKem768 = COSE_X25519_ML_KEM_768,
     /// Hybrid X25519 + ML-KEM-1024.
-    X25519MlKem1024,
+    X25519MlKem1024 = COSE_X25519_ML_KEM_1024,
 }
 
 /// A supported authenticated-encryption (AEAD) algorithm.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(i32)]
 pub enum AeadAlg {
     /// AES-256-GCM.
-    Aes256Gcm,
+    Aes256Gcm = COSE_AES_256_GCM,
     /// ChaCha20-Poly1305.
-    ChaCha20Poly1305,
+    ChaCha20Poly1305 = COSE_CHACHA20_POLY1305,
 }
 
 /// A supported key-derivation function (KDF).
@@ -78,11 +81,7 @@ const COSE_CHACHA20_POLY1305: i32 = 24;
 impl SigAlg {
     /// The COSE algorithm codepoint that identifies this algorithm on the wire.
     pub fn cose_id(self) -> i32 {
-        match self {
-            SigAlg::HssLmsSha256 => COSE_HSS_LMS,
-            SigAlg::MlDsa65 => COSE_ML_DSA_65,
-            SigAlg::MlDsa87 => COSE_ML_DSA_87,
-        }
+        self as i32
     }
 
     /// The algorithm for a COSE codepoint, or `None` if it is not recognized.
@@ -99,12 +98,7 @@ impl SigAlg {
 impl KemAlg {
     /// The COSE algorithm codepoint that identifies this algorithm on the wire.
     pub fn cose_id(self) -> i32 {
-        match self {
-            KemAlg::MlKem768 => COSE_ML_KEM_768,
-            KemAlg::MlKem1024 => COSE_ML_KEM_1024,
-            KemAlg::X25519MlKem768 => COSE_X25519_ML_KEM_768,
-            KemAlg::X25519MlKem1024 => COSE_X25519_ML_KEM_1024,
-        }
+        self as i32
     }
 
     /// The algorithm for a COSE codepoint, or `None` if it is not recognized.
@@ -122,10 +116,7 @@ impl KemAlg {
 impl AeadAlg {
     /// The COSE algorithm codepoint that identifies this AEAD on the wire.
     pub fn cose_id(self) -> i32 {
-        match self {
-            AeadAlg::Aes256Gcm => COSE_AES_256_GCM,
-            AeadAlg::ChaCha20Poly1305 => COSE_CHACHA20_POLY1305,
-        }
+        self as i32
     }
 
     /// The AEAD for a COSE codepoint, or `None` if it is not recognized.
