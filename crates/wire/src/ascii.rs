@@ -4,8 +4,6 @@
 //! (0x20-0x7E). Bytes outside that range are rejected at the parse boundary, never silently
 //! transcoded.
 
-#[cfg(feature = "alloc")]
-use alloc::string::String;
 use core::{fmt, ops::Deref};
 
 use minicbor::encode::Write;
@@ -106,89 +104,6 @@ impl<'b, C> minicbor::Decode<'b, C> for AsciiStr<'b> {
     }
 }
 
-/// An owned string validated to contain only printable 7-bit US-ASCII.
-#[cfg(feature = "alloc")]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct AsciiString(String);
-
-#[cfg(feature = "alloc")]
-impl AsciiString {
-    /// The validated string slice.
-    pub fn as_str(&self) -> &str {
-        self.0.as_str()
-    }
-
-    /// Borrow this as an [`AsciiStr`] (no re-validation -- already validated on construction).
-    pub fn as_ascii_str(&self) -> AsciiStr<'_> {
-        AsciiStr(self.0.as_str())
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl AsRef<str> for AsciiString {
-    fn as_ref(&self) -> &str {
-        self.0.as_str()
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl TryFrom<&str> for AsciiString {
-    type Error = AsciiError;
-
-    fn try_from(s: &str) -> Result<Self, AsciiError> {
-        validate(s.as_bytes())?;
-        Ok(Self(String::from(s)))
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl TryFrom<String> for AsciiString {
-    type Error = AsciiError;
-
-    fn try_from(s: String) -> Result<Self, AsciiError> {
-        validate(s.as_bytes())?;
-        Ok(Self(s))
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl Deref for AsciiString {
-    type Target = str;
-
-    fn deref(&self) -> &str {
-        self.0.as_str()
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl fmt::Display for AsciiString {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.0.as_str())
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl<C> minicbor::Encode<C> for AsciiString {
-    fn encode<W: Write>(
-        &self,
-        e: &mut minicbor::Encoder<W>,
-        _: &mut C,
-    ) -> Result<(), minicbor::encode::Error<W::Error>> {
-        e.str(self.0.as_str())?.ok()
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl<'b, C> minicbor::Decode<'b, C> for AsciiString {
-    fn decode(d: &mut minicbor::Decoder<'b>, _: &mut C) -> Result<Self, minicbor::decode::Error> {
-        let s = d.str()?;
-        validate(s.as_bytes()).map_err(|_| {
-            minicbor::decode::Error::message("input is not printable 7-bit US-ASCII")
-        })?;
-        Ok(Self(String::from(s)))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -251,13 +166,6 @@ mod tests {
 
     #[cfg(feature = "alloc")]
     #[test]
-    fn asciistring_validates_on_construction() {
-        assert!(AsciiString::try_from("plain ascii").is_ok());
-        assert!(AsciiString::try_from("café").is_err());
-    }
-
-    #[cfg(feature = "alloc")]
-    #[test]
     fn asciistr_cbor_round_trip() {
         let original = AsciiStr::try_from("firmware-slot-0").unwrap();
         let bytes = codec::encode(&original).expect("encode");
@@ -265,15 +173,6 @@ mod tests {
         assert_eq!(decoded, original);
         // Deterministic: re-encoding yields identical bytes.
         assert_eq!(codec::encode(&decoded).expect("re-encode"), bytes);
-    }
-
-    #[cfg(feature = "alloc")]
-    #[test]
-    fn asciistring_cbor_round_trip() {
-        let original = AsciiString::try_from("firmware-slot-0").unwrap();
-        let bytes = codec::encode(&original).expect("encode");
-        let decoded: AsciiString = codec::decode(&bytes).expect("decode");
-        assert_eq!(decoded, original);
     }
 
     #[cfg(feature = "alloc")]
@@ -348,24 +247,11 @@ mod proptests {
     use proptest::prelude::*;
 
     use super::*;
-    use crate::codec;
 
     // Upper bound on the length of generated inputs.
     const MAX_LEN: usize = 64;
 
     proptest! {
-        #[test]
-        fn ascii_string_round_trips(bytes in proptest::collection::vec(PRINTABLE_ASCII, 0..=MAX_LEN)) {
-            // Every byte is printable ASCII, so construction always succeeds.
-            let text = String::from_utf8(bytes).unwrap();
-            let original = AsciiString::try_from(text).unwrap();
-            let encoded = codec::encode(&original).unwrap();
-            let decoded: AsciiString = codec::decode(&encoded).unwrap();
-            let reencoded = codec::encode(&decoded).unwrap();
-            prop_assert_eq!(decoded, original);
-            prop_assert_eq!(reencoded, encoded);
-        }
-
         // Construction succeeds iff the input is valid UTF-8 and every byte is printable ASCII.
         #[test]
         fn ascii_accepts_iff_printable(bytes in proptest::collection::vec(any::<u8>(), 0..=MAX_LEN)) {
