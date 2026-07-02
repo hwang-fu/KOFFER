@@ -11,9 +11,13 @@
 //! primitive never generates one, which keeps responsibility for using a fresh
 //! nonce per key with the composition that owns the key.
 
-use aes_gcm::{AeadInPlace, Aes256Gcm as GcmCipher, KeyInit, aead::generic_array::GenericArray};
-// `AeadInPlace`, `KeyInit`, and `GenericArray` above come from the `aead` crate that both
-// RustCrypto AEADs re-export, so the ChaCha20-Poly1305 cipher reuses them; only the type differs.
+use aes_gcm::{
+    AeadInOut, Aes256Gcm as GcmCipher, KeyInit,
+    aead::{Nonce as CipherNonce, Tag as CipherTag},
+};
+// `AeadInOut`, `KeyInit`, and the `Nonce`/`Tag` array aliases above come from the `aead` crate
+// that both RustCrypto AEADs re-export, so the ChaCha20-Poly1305 cipher reuses them; only the
+// concrete cipher type differs.
 use chacha20poly1305::ChaCha20Poly1305 as ChaChaCipher;
 use koffer_common::bytes::Bytes;
 use koffer_derive::{ByteNewtype, SecretByteNewtype};
@@ -71,36 +75,31 @@ pub trait Aead {
 // The seal and open bodies are generic over the cipher type; the two backends differ
 // only by which RustCrypto cipher they instantiate (both share the `aead` crate traits).
 
-/// Validates the nonce length and copies it into a fixed array.
-fn nonce_bytes(nonce: &Nonce) -> Result<[u8; NONCE_LEN], AeadError> {
-    nonce
-        .as_slice()
-        .try_into()
-        .map_err(|_| AeadError::MalformedNonce)
-}
-
 /// Loads an AEAD cipher from a key, mapping a wrong-length key to `MalformedKey`.
 fn load_cipher<C: KeyInit>(key: &Key) -> Result<C, AeadError> {
     C::new_from_slice(key.as_slice()).map_err(|_| AeadError::MalformedKey)
 }
 
 /// Seals `buffer` in place with cipher `C` and returns the detached tag.
-fn seal_with<C: AeadInPlace + KeyInit>(
+fn seal_with<C: AeadInOut + KeyInit>(
     key: &Key,
     nonce: &Nonce,
     aad: &[u8],
     buffer: &mut [u8],
 ) -> Result<Tag, AeadError> {
     let cipher = load_cipher::<C>(key)?;
-    let nonce = nonce_bytes(nonce)?;
+    let nonce: &CipherNonce<C> = nonce
+        .as_slice()
+        .try_into()
+        .map_err(|_| AeadError::MalformedNonce)?;
     let tag = cipher
-        .encrypt_in_place_detached(GenericArray::from_slice(&nonce), aad, buffer)
+        .encrypt_inout_detached(nonce, aad, buffer.into())
         .map_err(|_| AeadError::Internal)?;
     Tag::try_from(tag.as_slice()).map_err(|_| AeadError::Internal)
 }
 
 /// Verifies `tag` over `buffer` and `aad`, then decrypts `buffer` in place with cipher `C`.
-fn unseal_with<C: AeadInPlace + KeyInit>(
+fn unseal_with<C: AeadInOut + KeyInit>(
     key: &Key,
     nonce: &Nonce,
     aad: &[u8],
@@ -108,20 +107,18 @@ fn unseal_with<C: AeadInPlace + KeyInit>(
     tag: &Tag,
 ) -> Result<(), AeadError> {
     let cipher = load_cipher::<C>(key)?;
-    let nonce = nonce_bytes(nonce)?;
+    let nonce: &CipherNonce<C> = nonce
+        .as_slice()
+        .try_into()
+        .map_err(|_| AeadError::MalformedNonce)?;
     // A wrong-length tag cannot authenticate, so it is reported as a plain
     // unseal failure rather than a distinct error.
-    let tag: [u8; TAG_LEN] = tag
+    let tag: &CipherTag<C> = tag
         .as_slice()
         .try_into()
         .map_err(|_| AeadError::UnsealFailed)?;
     cipher
-        .decrypt_in_place_detached(
-            GenericArray::from_slice(&nonce),
-            aad,
-            buffer,
-            GenericArray::from_slice(&tag),
-        )
+        .decrypt_inout_detached(nonce, aad, buffer.into(), tag)
         .map_err(|_| AeadError::UnsealFailed)
 }
 
