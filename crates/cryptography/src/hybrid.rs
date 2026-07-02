@@ -55,7 +55,7 @@ fn combine_shared_secrets<K: Kdf>(
 
 // Stack-buffer capacity for assembling a concatenated value: the biggest hybrid
 // key or ciphertext (the ML-KEM-1024 part plus the 32-byte X25519 part).
-const JOIN_MAX: usize = 1600;
+const CONCAT_MAX: usize = 1600;
 
 /// Splits hybrid bytes into the ML-KEM part (all but the last 32 bytes) and the
 /// 32-byte X25519 part. `None` if there are fewer than 32 bytes.
@@ -84,7 +84,7 @@ fn concat_into<T>(head: &[u8], tail: &[u8; 32]) -> Result<T, KemError>
 where
     for<'a> T: TryFrom<&'a [u8]>,
 {
-    let mut buf = [0u8; JOIN_MAX];
+    let mut buf = [0u8; CONCAT_MAX];
     let joined = concat(&mut buf, head, tail)
         .and_then(|bytes| T::try_from(bytes).map_err(|_| KemError::Internal));
     buf.zeroize();
