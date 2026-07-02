@@ -6,7 +6,7 @@
 //! catches a disagreeing reference.
 
 use koffer_conformance::{
-    KemMismatch, MlKemNative, MlKemReference, MlKemSet, OqsMlKem, differential_decapsulate, kat,
+    Mismatch, MlKemNative, MlKemReference, MlKemSet, OqsMlKem, differential_decapsulate, kat,
 };
 use proptest::prelude::*;
 
@@ -97,7 +97,7 @@ fn differential_catches_a_wrong_reference() {
         r.field("seed").unwrap(),
         r.field("ciphertext").unwrap(),
     ) {
-        Err(KemMismatch { ours, reference }) => {
+        Err(Mismatch { ours, reference }) => {
             assert_eq!(ours.as_deref(), Some(expected));
             assert_eq!(reference, Some(vec![0u8; 32]));
         }

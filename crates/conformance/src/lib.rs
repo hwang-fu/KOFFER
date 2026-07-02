@@ -169,12 +169,26 @@ fn our_verify_with<P: ml_dsa::MlDsaParams>(
 }
 
 /// The two backends disagreed on one input -- the differential found a defect.
+///
+/// Generic over the answer type `T`: `bool` for the accept/reject verify differentials,
+/// `Option<Vec<u8>>` for the decapsulate differential (where `None` means the input was
+/// treated as malformed).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Mismatch {
-    /// What our backend answered (true = accept).
-    pub ours: bool,
-    /// What the reference answered (true = accept).
-    pub reference: bool,
+pub struct Mismatch<T> {
+    /// What our backend produced.
+    pub ours: T,
+    /// What the reference produced.
+    pub reference: T,
+}
+
+/// Compares our backend's answer against the reference's: `Ok(answer)` when they agree
+/// (carrying their shared answer), `Err(Mismatch)` when they differ -- a finding.
+fn differential<T: PartialEq>(ours: T, reference: T) -> Result<T, Mismatch<T>> {
+    if ours == reference {
+        Ok(ours)
+    } else {
+        Err(Mismatch { ours, reference })
+    }
 }
 
 /// Runs our backend and `reference` on the same verify input and compares them.
@@ -187,17 +201,10 @@ pub fn differential_verify(
     public_key: &[u8],
     message: &[u8],
     signature: &[u8],
-) -> Result<bool, Mismatch> {
+) -> Result<bool, Mismatch<bool>> {
     let ours = our_verify(set, public_key, message, signature);
     let theirs = reference.verify(set, public_key, message, signature);
-    if ours == theirs {
-        Ok(ours)
-    } else {
-        Err(Mismatch {
-            ours,
-            reference: theirs,
-        })
-    }
+    differential(ours, theirs)
 }
 
 /// The ML-KEM parameter set under test.
@@ -320,35 +327,19 @@ pub fn our_decapsulate(set: MlKemSet, seed: &[u8], ciphertext: &[u8]) -> Option<
     }
 }
 
-/// The two backends produced different shared secrets for the same input -- a finding.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct KemMismatch {
-    /// What our backend produced (`None` = it treated the input as malformed).
-    pub ours: Option<Vec<u8>>,
-    /// What the reference produced.
-    pub reference: Option<Vec<u8>>,
-}
-
 /// Runs our backend and `reference` decapsulate on the same input and compares them.
 ///
 /// `Ok(secret)` means they agree (the shared secret, or `None` if both rejected the
-/// input as malformed); `Err(KemMismatch)` means they disagree.
+/// input as malformed); `Err(Mismatch)` means they disagree.
 pub fn differential_decapsulate(
     reference: &dyn MlKemReference,
     set: MlKemSet,
     seed: &[u8],
     ciphertext: &[u8],
-) -> Result<Option<Vec<u8>>, KemMismatch> {
+) -> Result<Option<Vec<u8>>, Mismatch<Option<Vec<u8>>>> {
     let ours = our_decapsulate(set, seed, ciphertext);
     let theirs = reference.decapsulate(set, seed, ciphertext);
-    if ours == theirs {
-        Ok(ours)
-    } else {
-        Err(KemMismatch {
-            ours,
-            reference: theirs,
-        })
-    }
+    differential(ours, theirs)
 }
 
 // FFI to the vendored Cisco hash-sigs verify entry point (`build.rs` compiles it).
@@ -416,15 +407,8 @@ pub fn differential_lms_verify(
     public_key: &[u8],
     message: &[u8],
     signature: &[u8],
-) -> Result<bool, Mismatch> {
+) -> Result<bool, Mismatch<bool>> {
     let ours = our_lms_verify(public_key, message, signature);
     let theirs = reference.verify(public_key, message, signature);
-    if ours == theirs {
-        Ok(ours)
-    } else {
-        Err(Mismatch {
-            ours,
-            reference: theirs,
-        })
-    }
+    differential(ours, theirs)
 }
