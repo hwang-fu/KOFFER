@@ -15,6 +15,8 @@ use aes_gcm::{AeadInPlace, Aes256Gcm as GcmCipher, KeyInit, aead::generic_array:
 // `AeadInPlace`, `KeyInit`, and `GenericArray` above come from the `aead` crate that both
 // RustCrypto AEADs re-export, so the ChaCha20-Poly1305 cipher reuses them; only the type differs.
 use chacha20poly1305::ChaCha20Poly1305 as ChaChaCipher;
+use koffer_common::bytes::Bytes;
+use koffer_derive::{ByteNewtype, SecretByteNewtype};
 
 use crate::error::AeadError;
 
@@ -24,20 +26,17 @@ pub const KEY_LEN: usize = 32; // AES-256 key
 pub const NONCE_LEN: usize = 12; // 96-bit GCM nonce
 pub const TAG_LEN: usize = 16; // 128-bit GCM tag
 
-secret_bytes_newtype! {
-    /// A symmetric AEAD key, as raw bytes. 32 bytes for both backends.
-    Key, KEY_LEN
-}
+/// A symmetric AEAD key, as raw bytes. 32 bytes for both backends.
+#[derive(Clone, PartialEq, Eq, SecretByteNewtype)]
+pub struct Key(Bytes<KEY_LEN>);
 
-bytes_newtype! {
-    /// An AEAD nonce ("number used once"), as raw bytes. 12 bytes for both backends.
-    Nonce, NONCE_LEN
-}
+/// An AEAD nonce ("number used once"), as raw bytes. 12 bytes for both backends.
+#[derive(Debug, Clone, PartialEq, Eq, ByteNewtype)]
+pub struct Nonce(Bytes<NONCE_LEN>);
 
-bytes_newtype! {
-    /// An AEAD authentication tag, as raw bytes. 16 bytes for both backends.
-    Tag, TAG_LEN
-}
+/// An AEAD authentication tag, as raw bytes. 16 bytes for both backends.
+#[derive(Debug, Clone, PartialEq, Eq, ByteNewtype)]
+pub struct Tag(Bytes<TAG_LEN>);
 
 /// An authenticated-encryption backend operating in place on a caller buffer.
 ///
