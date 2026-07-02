@@ -9,7 +9,7 @@
 //! codepoint. The KEM is the hybrid X25519 + ML-KEM; the AEAD is AES-256-GCM.
 
 use koffer_cryptography::{
-    aead::{Aes256Gcm, Nonce, Tag},
+    aead::{Aes256Gcm, Nonce, TAG_LEN, Tag},
     alg::KemAlg,
     hybrid::{X25519MlKem768, X25519MlKem1024},
     kdf::Hkdf,
@@ -24,9 +24,6 @@ use koffer_wire::{
 };
 use rand_core::CryptoRng;
 use sha2::{Sha256, Sha384};
-
-// AES-256-GCM authentication tag length; the body is framed as `ciphertext || tag`.
-const TAG_LEN: usize = 16;
 
 /// Seals `plaintext` to a fresh recipient keypair under `profile` and frames it as an
 /// encoded `COSE_Encrypt`. Returns the encoding and the decapsulation key that unseals it.
