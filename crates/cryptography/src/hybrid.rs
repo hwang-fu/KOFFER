@@ -34,8 +34,8 @@ const INFO_MAX: usize = 26 + 1568 + 32;
 fn combine<K: Kdf>(
     kdf: &K,
     label: &[u8],
-    ss_mlkem: &[u8],
     ss_x25519: &[u8],
+    ss_mlkem: &[u8],
     ciphertext: &[u8],
 ) -> Result<SharedSecret, KemError> {
     // info = label || the full hybrid ciphertext (ml-kem ct || x25519 ephemeral key).
@@ -149,8 +149,8 @@ macro_rules! impl_hybrid_backend {
                 let shared = combine(
                     &Hkdf::<$hash>::new(),
                     $label,
-                    ss_mlkem.as_slice(),
                     &ss_x25519,
+                    ss_mlkem.as_slice(),
                     ciphertext.as_slice(),
                 );
                 ss_x25519.zeroize();
@@ -179,8 +179,8 @@ macro_rules! impl_hybrid_backend {
                 let shared = combine(
                     &Hkdf::<$hash>::new(),
                     $label,
-                    ss_mlkem.as_slice(),
                     &ss_x25519,
+                    ss_mlkem.as_slice(),
                     ciphertext.as_slice(),
                 );
                 ss_x25519.zeroize();
