@@ -11,7 +11,7 @@ use koffer_cryptography::{
     sign::{SigningKey, StatefulSigner, VerifyingKey},
 };
 use hbs_lms::Sha256_256;
-use koffer_difftest::{HashSigs, LmsReference, Mismatch, differential_lms_verify, kat};
+use koffer_conformance::{HashSigs, LmsReference, Mismatch, differential_lms_verify, kat};
 use proptest::prelude::*;
 
 const TC1: &str = include_str!("../../../kat/lms/rfc8554-tc1.kat");

@@ -14,7 +14,7 @@ The upstream **monolithic multi-level** integration pattern (`examples/monolithi
 - `mlkem_native_all.c` / `mlkem_native_all.h` -- the upstream multilevel wrappers, which `#include mlkem_native.c` once per security level.
 - `randombytes_stub.c` -- a local stub (see below).
 
-`crates/difftest/build.rs` compiles `mlkem_native_all.c` with `cc` (include path `mlkem_native/`); the harness calls four functions -- `mlkem768_keypair_derand` / `mlkem768_dec` and the 1024 pair -- through hand-written `extern "C"` declarations (no `bindgen`, so no `libclang` dependency). Host-only; never part of the firmware build.
+`crates/conformance/build.rs` compiles `mlkem_native_all.c` with `cc` (include path `mlkem_native/`); the harness calls four functions -- `mlkem768_keypair_derand` / `mlkem768_dec` and the 1024 pair -- through hand-written `extern "C"` declarations (no `bindgen`, so no `libclang` dependency). Host-only; never part of the firmware build.
 
 ## Local additions and omissions
 

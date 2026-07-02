@@ -13,7 +13,7 @@ Only the **verify** path -- the exact source set of the upstream `hss_verify.a` 
 - 12 `.c` files: `hss_verify.c`, `hss_verify_inc.c`, `hss_common.c`, `hss_thread_single.c`, `hss_zeroize.c`, `lm_common.c`, `lm_ots_common.c`, `lm_ots_verify.c`, `lm_verify.c`, `endian.c`, `hash.c`, `sha256.c`.
 - 16 `.h` files: the header closure those sources include (computed with `gcc -MM`).
 
-`crates/difftest/build.rs` compiles these with the `cc` crate; the harness calls a single function, `hss_validate_signature`, through one hand-written `extern "C"` declaration (no `bindgen`, so no `libclang` dependency). The build is host-only and is never part of the firmware build.
+`crates/conformance/build.rs` compiles these with the `cc` crate; the harness calls a single function, `hss_validate_signature`, through one hand-written `extern "C"` declaration (no `bindgen`, so no `libclang` dependency). The build is host-only and is never part of the firmware build.
 
 ## Local modification
 

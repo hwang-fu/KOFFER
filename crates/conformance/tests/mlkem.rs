@@ -5,7 +5,7 @@
 //! a randomized implicit-rejection proptest, and a meta-test proving the harness
 //! catches a disagreeing reference.
 
-use koffer_difftest::{
+use koffer_conformance::{
     KemMismatch, MlKemNative, MlKemReference, MlKemSet, OqsMlKem, differential_decapsulate, kat,
 };
 use proptest::prelude::*;

@@ -653,6 +653,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "koffer-conformance"
+version = "0.1.0"
+dependencies = [
+ "cc",
+ "hbs-lms",
+ "koffer-cryptography",
+ "ml-dsa",
+ "ml-kem",
+ "oqs",
+ "proptest",
+]
+
+[[package]]
 name = "koffer-cryptography"
 version = "0.1.0"
 dependencies = [
@@ -682,19 +695,6 @@ dependencies = [
  "ml-dsa",
  "rand_core 0.10.1",
  "sha2",
-]
-
-[[package]]
-name = "koffer-difftest"
-version = "0.1.0"
-dependencies = [
- "cc",
- "hbs-lms",
- "koffer-cryptography",
- "ml-dsa",
- "ml-kem",
- "oqs",
- "proptest",
 ]
 
 [[package]]
