@@ -1,5 +1,8 @@
 //! Key-exchange (KEM) value types: keys, ciphertext, and shared secret.
 
+use koffer_common::bytes::Bytes;
+use koffer_derive::{ByteNewtype, SecretByteNewtype};
+
 use crate::error::KemError;
 
 // Buffer capacities, each the largest over the supported KEM algorithms -- the
@@ -10,25 +13,21 @@ const DECAPSULATION_KEY_MAX: usize = 3200; // X25519 (32) + ML-KEM-1024 dk (3168
 const CIPHERTEXT_MAX: usize = 1600; // X25519 (32) + ML-KEM-1024 ct (1568)
 const SHARED_SECRET_MAX: usize = 32; // combiner output
 
-bytes_newtype! {
-    /// A public encapsulation key, as raw bytes.
-    EncapsulationKey, ENCAPSULATION_KEY_MAX
-}
+/// A public encapsulation key, as raw bytes.
+#[derive(Debug, Clone, PartialEq, Eq, ByteNewtype)]
+pub struct EncapsulationKey(Bytes<ENCAPSULATION_KEY_MAX>);
 
-secret_bytes_newtype! {
-    /// A secret decapsulation key, as raw bytes.
-    DecapsulationKey, DECAPSULATION_KEY_MAX
-}
+/// A secret decapsulation key, as raw bytes.
+#[derive(Clone, PartialEq, Eq, SecretByteNewtype)]
+pub struct DecapsulationKey(Bytes<DECAPSULATION_KEY_MAX>);
 
-bytes_newtype! {
-    /// A KEM ciphertext (the sealed value), as raw bytes.
-    Ciphertext, CIPHERTEXT_MAX
-}
+/// A KEM ciphertext (the sealed value), as raw bytes.
+#[derive(Debug, Clone, PartialEq, Eq, ByteNewtype)]
+pub struct Ciphertext(Bytes<CIPHERTEXT_MAX>);
 
-secret_bytes_newtype! {
-    /// A derived shared secret, as raw bytes.
-    SharedSecret, SHARED_SECRET_MAX
-}
+/// A derived shared secret, as raw bytes.
+#[derive(Clone, PartialEq, Eq, SecretByteNewtype)]
+pub struct SharedSecret(Bytes<SHARED_SECRET_MAX>);
 
 /// A key-encapsulation backend: agree a shared secret using a peer's public key.
 ///
