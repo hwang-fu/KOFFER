@@ -9,7 +9,6 @@ extern crate alloc;
 
 pub mod alg;
 pub mod ascii;
-pub mod bytes;
 pub mod codec;
 pub mod cose;
 pub mod error;
