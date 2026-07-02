@@ -195,7 +195,7 @@ fn differential<T: PartialEq>(ours: T, reference: T) -> Result<T, Mismatch<T>> {
 ///
 /// `Ok(accepted)` means they agree (and `accepted` is their shared answer);
 /// `Err(Mismatch)` means they disagree, which is a finding.
-pub fn differential_verify(
+pub fn differential_mldsa_verify(
     reference: &dyn MlDsaReference,
     set: MlDsaSet,
     public_key: &[u8],

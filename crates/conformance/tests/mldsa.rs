@@ -5,7 +5,9 @@
 //! randomized valid and tampered signatures, and a meta-test proving the harness
 //! actually catches a disagreeing reference.
 
-use koffer_conformance::{Mismatch, MlDsaReference, MlDsaSet, OqsMlDsa, differential_verify, kat};
+use koffer_conformance::{
+    Mismatch, MlDsaReference, MlDsaSet, OqsMlDsa, differential_mldsa_verify, kat,
+};
 use koffer_cryptography::{
     mldsa::MlDsa,
     sign::{Signer, SigningKey, VerifyingKey},
@@ -43,7 +45,7 @@ fn verify_kat_differential(set: MlDsaSet, vectors: &str) {
         let message = r.field("message").unwrap();
         let signature = r.field("signature").unwrap();
         let expected = r.field("result").unwrap()[0] == 0x01;
-        match differential_verify(&OqsMlDsa, set, public_key, message, signature) {
+        match differential_mldsa_verify(&OqsMlDsa, set, public_key, message, signature) {
             Ok(agreed) => assert_eq!(
                 agreed, expected,
                 "{set:?} tcId {tc_id}: agreed answer differs from the vector"
@@ -86,7 +88,7 @@ proptest! {
     fn valid_signature_both_accept(message in prop::collection::vec(any::<u8>(), 0..512)) {
         let (signing_key, verifying_key) = mldsa65_keypair();
         let signature = MlDsa::<MlDsa65>::new().sign(signing_key, &message).unwrap();
-        let agreed = differential_verify(
+        let agreed = differential_mldsa_verify(
             &OqsMlDsa,
             MlDsaSet::MlDsa65,
             verifying_key.as_slice(),
@@ -108,7 +110,7 @@ proptest! {
         let mut bytes = signature.as_slice().to_vec();
         let at = flip % bytes.len();
         bytes[at] ^= 0x01;
-        let agreed = differential_verify(
+        let agreed = differential_mldsa_verify(
             &OqsMlDsa,
             MlDsaSet::MlDsa65,
             verifying_key.as_slice(),
@@ -145,7 +147,7 @@ fn differential_catches_a_wrong_reference() {
         .iter()
         .find(|r| r.field("result").unwrap()[0] == 0x00)
         .expect("a must-reject vector exists");
-    let result = differential_verify(
+    let result = differential_mldsa_verify(
         &AlwaysAccept,
         MlDsaSet::MlDsa65,
         reject.field("public_key").unwrap(),
