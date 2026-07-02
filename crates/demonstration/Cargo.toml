@@ -6,7 +6,9 @@ rust-version.workspace = true
 repository.workspace = true
 
 [dependencies]
-koffer-cryptography = { version = "0.1.0", path = "../cryptography", features = ["std"] }
+koffer-cryptography = { version = "0.1.0", path = "../cryptography", features = [
+    "std",
+] }
 koffer-wire = { version = "0.1.0", path = "../wire", features = ["std"] }
 ml-dsa = { version = "0.1.1", default-features = false }
 rand_core = { version = "0.10.1", default-features = false }
