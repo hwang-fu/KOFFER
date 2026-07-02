@@ -13,7 +13,7 @@ use crypto::{
     sign::{Signature, Signer, SigningKey, Verifier, VerifyingKey},
 };
 use ml_dsa::{MlDsa65, MlDsa87};
-use proto::{
+use koffer_wire::{
     alg::AlgId,
     codec,
     cose::{CoseSign1, Payload, SigStructure},
@@ -99,7 +99,7 @@ fn verifier_from_codepoint(alg_id: AlgId) -> Box<dyn Verifier> {
 
 #[cfg(test)]
 mod tests {
-    use proto::{ascii::AsciiStr, manifest::SuitDigest};
+    use koffer_wire::{ascii::AsciiStr, manifest::SuitDigest};
 
     use super::*;
 

@@ -17,7 +17,7 @@ use crypto::{
     profile::CryptoProfile,
     seal::{Sealed, seal, unseal},
 };
-use proto::{
+use koffer_wire::{
     alg::AlgId,
     codec,
     cose::{CoseEncrypt, Recipient},

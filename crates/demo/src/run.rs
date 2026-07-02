@@ -1,5 +1,5 @@
 use crypto::profile::CryptoProfile;
-use proto::{
+use koffer_wire::{
     alg::AlgId,
     ascii::AsciiStr,
     manifest::{Manifest, SuitDigest},

@@ -5,7 +5,7 @@
 //! it via the KDF, then AEAD-encrypt the payload. Only the holder of the KEM private key
 //! can decapsulate and open it (RFC 9180-aligned). The components are returned as raw
 //! bytes; the `COSE_Encrypt` framing is applied by the consumer, so this crate stays
-//! independent of `koffer-proto`.
+//! independent of `koffer-wire`.
 
 use zeroize::Zeroize;
 

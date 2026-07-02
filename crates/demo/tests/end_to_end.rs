@@ -4,7 +4,7 @@
 use crypto::profile::CryptoProfile;
 use koffer_demo::{run, seal, sign};
 use koffer_testutil::TestRng;
-use proto::{
+use koffer_wire::{
     alg::AlgId,
     ascii::AsciiStr,
     manifest::{Manifest, SuitDigest},

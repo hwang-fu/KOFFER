@@ -48,7 +48,7 @@ jobs:
         run: rustup show
       - uses: Swatinem/rust-cache@v2
       - name: Build (no_std, Cortex-M33F)
-        run: cargo build --target thumbv8m.main-none-eabihf -p koffer-proto -p koffer-crypto
+        run: cargo build --target thumbv8m.main-none-eabihf -p koffer-wire -p koffer-crypto
 
   fmt:
     name: rustfmt (nightly)

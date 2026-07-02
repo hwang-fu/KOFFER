@@ -1,4 +1,4 @@
-//! CBOR codec for koffer-proto: a thin, backend-agnostic layer over the CBOR backend.
+//! CBOR codec for koffer-wire: a thin, backend-agnostic layer over the CBOR backend.
 
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;

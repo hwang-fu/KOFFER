@@ -7,8 +7,8 @@ repository.workspace = true
 
 [dependencies]
 crypto = { version = "0.1.0", path = "../crypto", package = "koffer-crypto", features = ["std"] }
+koffer-wire = { version = "0.1.0", path = "../wire", features = ["std"] }
 ml-dsa = { version = "0.1.1", default-features = false }
-proto = { version = "0.1.0", path = "../proto", package = "koffer-proto", features = ["std"] }
 rand_core = { version = "0.10.1", default-features = false }
 sha2 = { version = "0.10", default-features = false }
 
