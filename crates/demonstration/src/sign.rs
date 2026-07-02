@@ -32,8 +32,8 @@ pub fn sign_manifest(
     let manifest_bytes = codec::encode(manifest).expect("encode manifest");
 
     let (signer, signing_key, verifying_key) = make_signer(alg, entropy);
-    let to_be_signed = codec::encode(&SigStructure::new(alg_id, &[], &manifest_bytes))
-        .expect("encode Sig_structure");
+    let to_be_signed =
+        codec::encode(&sig_structure(alg_id, &manifest_bytes)).expect("encode Sig_structure");
     let signature = signer
         .sign(&signing_key, &to_be_signed)
         .expect("sign Sig_structure");
@@ -62,8 +62,7 @@ pub fn verify_manifest(cose_bytes: &[u8], verifying_key: &VerifyingKey) -> bool 
     let Ok(signature) = Signature::try_from(cose.signature()) else {
         return false;
     };
-    let Ok(to_be_signed) = codec::encode(&SigStructure::new(cose.alg(), &[], manifest_bytes))
-    else {
+    let Ok(to_be_signed) = codec::encode(&sig_structure(cose.alg(), manifest_bytes)) else {
         return false;
     };
     verifier_from_codepoint(cose.alg())
@@ -95,6 +94,13 @@ fn verifier_from_codepoint(alg_id: AlgId) -> Box<dyn Verifier> {
         Some(SigAlg::MlDsa87) => Box::new(MlDsa::<MlDsa87>::new()),
         other => panic!("unsupported signature codepoint: {other:?}"),
     }
+}
+
+/// Builds the COSE Sig_structure (the to-be-signed bytes) for `manifest_bytes` under
+/// `alg`, with empty external AAD -- the single construction shared by the signer and
+/// the verifier, so the two can never disagree on what is signed.
+fn sig_structure<'a>(alg: AlgId, manifest_bytes: &'a [u8]) -> SigStructure<'a> {
+    SigStructure::new(alg, &[], manifest_bytes)
 }
 
 #[cfg(test)]
