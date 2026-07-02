@@ -1,5 +1,8 @@
 //! Signing-side value types: keys and signatures.
 
+use koffer_common::bytes::Bytes;
+use koffer_derive::{ByteNewtype, SecretByteNewtype};
+
 use crate::error::{SignError, VerifyError};
 
 // Buffer capacities, each the largest over the supported signature algorithms.
@@ -12,20 +15,17 @@ const VERIFYING_KEY_MAX: usize = 2592; // ML-DSA-87 public key
 // w=8, SHA-256) is about 2964 bytes -- comfortably under this.
 const SIGNATURE_MAX: usize = 4627; // ML-DSA-87 signature
 
-secret_bytes_newtype! {
-    /// A secret signing key, as raw bytes.
-    SigningKey, SIGNING_KEY_MAX
-}
+/// A secret signing key, as raw bytes.
+#[derive(Clone, PartialEq, Eq, SecretByteNewtype)]
+pub struct SigningKey(Bytes<SIGNING_KEY_MAX>);
 
-bytes_newtype! {
-    /// A public verifying key, as raw bytes.
-    VerifyingKey, VERIFYING_KEY_MAX
-}
+/// A public verifying key, as raw bytes.
+#[derive(Debug, Clone, PartialEq, Eq, ByteNewtype)]
+pub struct VerifyingKey(Bytes<VERIFYING_KEY_MAX>);
 
-bytes_newtype! {
-    /// A signature, as raw bytes.
-    Signature, SIGNATURE_MAX
-}
+/// A signature, as raw bytes.
+#[derive(Debug, Clone, PartialEq, Eq, ByteNewtype)]
+pub struct Signature(Bytes<SIGNATURE_MAX>);
 
 /// A signing backend: produces a signature over a message with a secret key.
 ///
