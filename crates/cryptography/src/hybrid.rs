@@ -31,7 +31,7 @@ const INFO_MAX: usize = 26 + 1568 + 32;
 ///
 /// `ss_x25519` is the HKDF salt and `ss_mlkem` the IKM (the dual-PRF that makes the
 /// result secure if either component is); `label || ciphertext` is the `info`.
-fn combine<K: Kdf>(
+fn combine_shared_secrets<K: Kdf>(
     kdf: &K,
     label: &[u8],
     ss_x25519: &[u8],
@@ -146,7 +146,7 @@ macro_rules! impl_hybrid_backend {
                 eph_sk.zeroize();
 
                 let ciphertext = concat_into::<Ciphertext>(mlkem_ct.as_slice(), &eph_pk)?;
-                let shared = combine(
+                let shared = combine_shared_secrets(
                     &Hkdf::<$hash>::new(),
                     $label,
                     &ss_x25519,
@@ -176,7 +176,7 @@ macro_rules! impl_hybrid_backend {
                 let mut ss_x25519 = crate::x25519::dh(&x25519_sk, &eph_pk);
                 x25519_sk.zeroize();
 
-                let shared = combine(
+                let shared = combine_shared_secrets(
                     &Hkdf::<$hash>::new(),
                     $label,
                     &ss_x25519,
@@ -212,33 +212,40 @@ mod tests {
     #[test]
     fn combine_is_deterministic() {
         let kdf = Hkdf::<Sha256>::new();
-        let a = combine(&kdf, LABEL_768, &SS_MLKEM, &SS_X25519, &CIPHERTEXT).unwrap();
-        let b = combine(&kdf, LABEL_768, &SS_MLKEM, &SS_X25519, &CIPHERTEXT).unwrap();
+        let a =
+            combine_shared_secrets(&kdf, LABEL_768, &SS_MLKEM, &SS_X25519, &CIPHERTEXT).unwrap();
+        let b =
+            combine_shared_secrets(&kdf, LABEL_768, &SS_MLKEM, &SS_X25519, &CIPHERTEXT).unwrap();
         assert_eq!(a.as_slice(), b.as_slice());
     }
 
     #[test]
     fn combine_binds_every_input() {
         let kdf = Hkdf::<Sha256>::new();
-        let base = combine(&kdf, LABEL_768, &SS_MLKEM, &SS_X25519, &CIPHERTEXT).unwrap();
+        let base =
+            combine_shared_secrets(&kdf, LABEL_768, &SS_MLKEM, &SS_X25519, &CIPHERTEXT).unwrap();
 
         // Each input -- both secrets, the transcript, and the label -- changes the output.
         let mut ss_mlkem = SS_MLKEM;
         ss_mlkem[0] ^= 1;
-        let a = combine(&kdf, LABEL_768, &ss_mlkem, &SS_X25519, &CIPHERTEXT).unwrap();
+        let a =
+            combine_shared_secrets(&kdf, LABEL_768, &ss_mlkem, &SS_X25519, &CIPHERTEXT).unwrap();
         assert_ne!(a.as_slice(), base.as_slice());
 
         let mut ss_x25519 = SS_X25519;
         ss_x25519[0] ^= 1;
-        let b = combine(&kdf, LABEL_768, &SS_MLKEM, &ss_x25519, &CIPHERTEXT).unwrap();
+        let b =
+            combine_shared_secrets(&kdf, LABEL_768, &SS_MLKEM, &ss_x25519, &CIPHERTEXT).unwrap();
         assert_ne!(b.as_slice(), base.as_slice());
 
         let mut ciphertext = CIPHERTEXT;
         ciphertext[0] ^= 1;
-        let c = combine(&kdf, LABEL_768, &SS_MLKEM, &SS_X25519, &ciphertext).unwrap();
+        let c =
+            combine_shared_secrets(&kdf, LABEL_768, &SS_MLKEM, &SS_X25519, &ciphertext).unwrap();
         assert_ne!(c.as_slice(), base.as_slice());
 
-        let d = combine(&kdf, LABEL_1024, &SS_MLKEM, &SS_X25519, &CIPHERTEXT).unwrap();
+        let d =
+            combine_shared_secrets(&kdf, LABEL_1024, &SS_MLKEM, &SS_X25519, &CIPHERTEXT).unwrap();
         assert_ne!(d.as_slice(), base.as_slice());
     }
 
