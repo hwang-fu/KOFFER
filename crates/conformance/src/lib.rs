@@ -304,7 +304,7 @@ pub fn our_decapsulate(set: MlKemSet, seed: &[u8], ciphertext: &[u8]) -> Option<
     let ct = Ciphertext::try_from(ciphertext).ok()?;
     // `ml-kem`'s parameter bound is private, so a generic helper cannot name it; expand
     // the concrete keygen + decapsulate per parameter set.
-    macro_rules! decapsulate_with {
+    macro_rules! decapsulate_ours {
         ($param:ty) => {{
             let backend = koffer_cryptography::mlkem::MlKem::<$param>::new();
             let (_encapsulation_key, decapsulation_key) = backend.keygen(seed).ok()?;
@@ -315,8 +315,8 @@ pub fn our_decapsulate(set: MlKemSet, seed: &[u8], ciphertext: &[u8]) -> Option<
         }};
     }
     match set {
-        MlKemSet::MlKem768 => decapsulate_with!(ml_kem::MlKem768),
-        MlKemSet::MlKem1024 => decapsulate_with!(ml_kem::MlKem1024),
+        MlKemSet::MlKem768 => decapsulate_ours!(ml_kem::MlKem768),
+        MlKemSet::MlKem1024 => decapsulate_ours!(ml_kem::MlKem1024),
     }
 }
 
