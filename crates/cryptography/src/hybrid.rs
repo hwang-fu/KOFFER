@@ -77,6 +77,20 @@ fn join<'b>(buf: &'b mut [u8], head: &[u8], tail: &[u8; 32]) -> Result<&'b [u8],
     Ok(&buf[..n])
 }
 
+/// Concatenates `head || tail` in a scratch buffer and builds the bounded newtype
+/// `T` from the result, wiping the scratch buffer before returning. The wipe matters
+/// because the buffer may briefly hold secret key material (the decapsulation key).
+fn join_into<T>(head: &[u8], tail: &[u8; 32]) -> Result<T, KemError>
+where
+    for<'a> T: TryFrom<&'a [u8]>,
+{
+    let mut buf = [0u8; JOIN_MAX];
+    let joined = join(&mut buf, head, tail)
+        .and_then(|bytes| T::try_from(bytes).map_err(|_| KemError::Internal));
+    buf.zeroize();
+    joined
+}
+
 /// Generates a concrete hybrid backend for one (ML-KEM parameter set, hash, label)
 /// triple: a unit struct with `keygen` plus the `Kem` encapsulate / decapsulate.
 macro_rules! impl_hybrid_backend {
@@ -103,22 +117,10 @@ macro_rules! impl_hybrid_backend {
                     crate::x25519::keypair_from_entropy(&x25519_entropy);
                 x25519_entropy.zeroize();
 
-                let encapsulation_key = {
-                    let mut buf = [0u8; JOIN_MAX];
-                    EncapsulationKey::try_from(join(&mut buf, mlkem_ek.as_slice(), &x25519_pk)?)
-                        .map_err(|_| KemError::Internal)?
-                };
-                let decapsulation_key = {
-                    let mut buf = [0u8; JOIN_MAX];
-                    let dk = DecapsulationKey::try_from(join(
-                        &mut buf,
-                        mlkem_dk.as_slice(),
-                        &x25519_sk,
-                    )?)
-                    .map_err(|_| KemError::Internal)?;
-                    buf.zeroize();
-                    dk
-                };
+                let encapsulation_key =
+                    join_into::<EncapsulationKey>(mlkem_ek.as_slice(), &x25519_pk)?;
+                let decapsulation_key =
+                    join_into::<DecapsulationKey>(mlkem_dk.as_slice(), &x25519_sk)?;
                 x25519_sk.zeroize();
                 Ok((encapsulation_key, decapsulation_key))
             }
@@ -143,11 +145,7 @@ macro_rules! impl_hybrid_backend {
                 let mut ss_x25519 = crate::x25519::dh(&eph_sk, &x25519_pk);
                 eph_sk.zeroize();
 
-                let ciphertext = {
-                    let mut buf = [0u8; JOIN_MAX];
-                    Ciphertext::try_from(join(&mut buf, mlkem_ct.as_slice(), &eph_pk)?)
-                        .map_err(|_| KemError::Internal)?
-                };
+                let ciphertext = join_into::<Ciphertext>(mlkem_ct.as_slice(), &eph_pk)?;
                 let shared = combine(
                     &Hkdf::<$hash>::new(),
                     $label,
