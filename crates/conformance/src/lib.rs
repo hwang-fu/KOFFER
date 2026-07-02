@@ -138,7 +138,10 @@ pub fn our_verify(set: MlDsaSet, public_key: &[u8], message: &[u8], signature: &
     }
 }
 
-fn our_verify_with<P: ml_dsa::MlDsaParams>(
+/// The shared "does our backend accept?" body: a wrong-length key or signature is a
+/// rejection (not a panic), then delegate to the backend's `Verifier::verify`.
+fn verify_ours(
+    backend: &impl Verifier,
     public_key: &[u8],
     message: &[u8],
     signature: &[u8],
@@ -149,9 +152,20 @@ fn our_verify_with<P: ml_dsa::MlDsaParams>(
     ) else {
         return false;
     };
-    koffer_cryptography::mldsa::MlDsa::<P>::new()
-        .verify(&key, message, &sig)
-        .is_ok()
+    backend.verify(&key, message, &sig).is_ok()
+}
+
+fn our_verify_with<P: ml_dsa::MlDsaParams>(
+    public_key: &[u8],
+    message: &[u8],
+    signature: &[u8],
+) -> bool {
+    verify_ours(
+        &koffer_cryptography::mldsa::MlDsa::<P>::new(),
+        public_key,
+        message,
+        signature,
+    )
 }
 
 /// The two backends disagreed on one input -- the differential found a defect.
@@ -384,15 +398,12 @@ impl LmsReference for HashSigs {
 /// Showcase profile (2-level HSS, SHA-256). A wrong-length key or signature is a
 /// rejection, mirroring the reference.
 pub fn our_lms_verify(public_key: &[u8], message: &[u8], signature: &[u8]) -> bool {
-    let (Ok(key), Ok(sig)) = (
-        VerifyingKey::try_from(public_key),
-        Signature::try_from(signature),
-    ) else {
-        return false;
-    };
-    koffer_cryptography::lms::Lms::<hbs_lms::Sha256_256>::new()
-        .verify(&key, message, &sig)
-        .is_ok()
+    verify_ours(
+        &koffer_cryptography::lms::Lms::<hbs_lms::Sha256_256>::new(),
+        public_key,
+        message,
+        signature,
+    )
 }
 
 /// Runs our backend and `reference` on the same LMS verify input and compares them.
