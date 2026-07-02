@@ -58,15 +58,38 @@ fn combine_shared_secrets<K: Kdf>(
 const CONCAT_MAX: usize = 1600;
 
 /// Splits hybrid bytes into the ML-KEM part (all but the last 32 bytes) and the
-/// 32-byte X25519 part. `None` if there are fewer than 32 bytes.
+/// 32-byte X25519 part. Returns `None` if there are fewer than 32 bytes.
+///
+/// A hybrid key or ciphertext is laid out as the ML-KEM part followed by the
+/// 32-byte X25519 part; this recovers the two halves.
+///
+/// # Examples
+///
+/// ```text
+/// // 34 bytes: a 2-byte ML-KEM part, then the 32-byte X25519 part.
+/// split_last_32(&[0xAA, 0xBB, 0x01; 32])  ->  Some((&[0xAA, 0xBB], [0x01; 32]))
+///
+/// // Fewer than 32 bytes: nothing to split off.
+/// split_last_32(&[0xAA; 8])               ->  None
+/// ```
 fn split_last_32(bytes: &[u8]) -> Option<(&[u8], [u8; 32])> {
     let n = bytes.len().checked_sub(32)?;
     let tail: [u8; 32] = bytes[n..].try_into().ok()?;
     Some((&bytes[..n], tail))
 }
 
-/// Concatenates `head || tail` into `buf`, returning the filled slice (or
-/// `Internal` if the buffer is too small).
+/// Concatenates `head || tail` into `buf`, returning the filled `head.len() + 32`
+/// byte prefix of `buf`. Returns `Err(Internal)` if `buf` is too small to hold both.
+///
+/// # Examples
+///
+/// ```text
+/// let mut buf = [0u8; 64];
+/// concat(&mut buf, &[0xAA, 0xBB], &[0x01; 32])  ->  Ok(&[0xAA, 0xBB, 0x01; 32])  // 34 bytes
+///
+/// // A buffer smaller than head.len() + 32 cannot hold the result.
+/// concat(&mut [0u8; 10], &[0xAA, 0xBB], &[0x01; 32])  ->  Err(KemError::Internal)
+/// ```
 fn concat<'b>(buf: &'b mut [u8], head: &[u8], tail: &[u8; 32]) -> Result<&'b [u8], KemError> {
     let n = head.len() + tail.len();
     {
@@ -80,6 +103,15 @@ fn concat<'b>(buf: &'b mut [u8], head: &[u8], tail: &[u8; 32]) -> Result<&'b [u8
 /// Concatenates `head || tail` in a scratch buffer and builds the bounded newtype
 /// `T` from the result, wiping the scratch buffer before returning. The wipe matters
 /// because the buffer may briefly hold secret key material (the decapsulation key).
+///
+/// # Example
+///
+/// ```text
+/// // Assemble a hybrid encapsulation key from the ML-KEM public key and the
+/// // 32-byte X25519 public key, as one EncapsulationKey newtype:
+/// concat_into::<EncapsulationKey>(mlkem_ek.as_slice(), &x25519_pk)
+///     ->  Ok(EncapsulationKey(mlkem_ek || x25519_pk))
+/// ```
 fn concat_into<T>(head: &[u8], tail: &[u8; 32]) -> Result<T, KemError>
 where
     for<'a> T: TryFrom<&'a [u8]>,
