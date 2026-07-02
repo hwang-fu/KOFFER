@@ -1,6 +1,6 @@
 //! Host-only differential test harness for the KOFFER crypto backend.
 //!
-//! Runs the production `koffer-crypto` backend and an independent reference
+//! Runs the production `koffer-cryptography` backend and an independent reference
 //! implementation over the same inputs (the frozen `kat/` vectors plus
 //! randomized `proptest` cases) and asserts the two agree. This guards against
 //! a defect that the wrapped upstream crates and our own tests might share.
@@ -10,7 +10,7 @@
 //! and its (potentially C-backed) reference libraries are excluded by
 //! construction.
 
-use crypto::{
+use koffer_cryptography::{
     kem::{Ciphertext, Kem},
     sign::{Signature, Verifier, VerifyingKey},
 };
@@ -128,7 +128,7 @@ impl MlDsaReference for OqsMlDsa {
     }
 }
 
-/// Verifies with our `koffer-crypto` ML-DSA backend -- the implementation under test.
+/// Verifies with our `koffer-cryptography` ML-DSA backend -- the implementation under test.
 ///
 /// A wrong-length key or signature is a rejection, mirroring the reference.
 pub fn our_verify(set: MlDsaSet, public_key: &[u8], message: &[u8], signature: &[u8]) -> bool {
@@ -149,7 +149,7 @@ fn our_verify_with<P: ml_dsa::MlDsaParams>(
     ) else {
         return false;
     };
-    crypto::mldsa::MlDsa::<P>::new()
+    koffer_cryptography::mldsa::MlDsa::<P>::new()
         .verify(&key, message, &sig)
         .is_ok()
 }
@@ -282,7 +282,7 @@ impl MlKemReference for MlKemNative {
     }
 }
 
-/// Decapsulates with our `koffer-crypto` ML-KEM backend -- the implementation under test.
+/// Decapsulates with our `koffer-cryptography` ML-KEM backend -- the implementation under test.
 ///
 /// Derives the keypair from `seed`, then recovers the shared secret for `ciphertext`.
 /// A wrong-length seed or ciphertext is `None`, mirroring the reference.
@@ -292,7 +292,7 @@ pub fn our_decapsulate(set: MlKemSet, seed: &[u8], ciphertext: &[u8]) -> Option<
     // the concrete keygen + decapsulate per parameter set.
     macro_rules! decapsulate_with {
         ($param:ty) => {{
-            let backend = crypto::mlkem::MlKem::<$param>::new();
+            let backend = koffer_cryptography::mlkem::MlKem::<$param>::new();
             let (_encapsulation_key, decapsulation_key) = backend.keygen(seed).ok()?;
             backend
                 .decapsulate(&decapsulation_key, &ct)
@@ -379,7 +379,7 @@ impl LmsReference for HashSigs {
     }
 }
 
-/// Verifies with our `koffer-crypto` LMS backend -- the implementation under test.
+/// Verifies with our `koffer-cryptography` LMS backend -- the implementation under test.
 ///
 /// Showcase profile (2-level HSS, SHA-256). A wrong-length key or signature is a
 /// rejection, mirroring the reference.
@@ -390,7 +390,7 @@ pub fn our_lms_verify(public_key: &[u8], message: &[u8], signature: &[u8]) -> bo
     ) else {
         return false;
     };
-    crypto::lms::Lms::<hbs_lms::Sha256_256>::new()
+    koffer_cryptography::lms::Lms::<hbs_lms::Sha256_256>::new()
         .verify(&key, message, &sig)
         .is_ok()
 }

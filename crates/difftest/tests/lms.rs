@@ -1,4 +1,4 @@
-//! Differential tests for the LMS/HSS verify path: our `koffer-crypto` backend (wrapping
+//! Differential tests for the LMS/HSS verify path: our `koffer-cryptography` backend (wrapping
 //! `hbs-lms`) against the independent Cisco `hash-sigs` C reference.
 //!
 //! Three groups: the RFC 8554 HSS vectors replayed through both backends, a randomized
@@ -6,7 +6,7 @@
 //! harness catches a disagreeing reference. Showcase profile only -- hash-sigs implements
 //! full SHA-256, not the SHA-256/192 set our CNSA20 profile uses.
 
-use crypto::{
+use koffer_cryptography::{
     lms::{Lms, showcase_params},
     sign::{SigningKey, StatefulSigner, VerifyingKey},
 };

@@ -5,7 +5,7 @@
 use core::convert::Infallible;
 use std::process::ExitCode;
 
-use crypto::profile::CryptoProfile;
+use koffer_cryptography::profile::CryptoProfile;
 use koffer_demo::run::{RunReport, run};
 
 // Deterministic counter RNG. A demonstration does not need real entropy; a fixed seed keeps

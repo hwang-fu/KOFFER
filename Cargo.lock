@@ -653,7 +653,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "koffer-crypto"
+name = "koffer-cryptography"
 version = "0.1.0"
 dependencies = [
  "aes-gcm",
@@ -676,7 +676,7 @@ dependencies = [
 name = "koffer-demo"
 version = "0.1.0"
 dependencies = [
- "koffer-crypto",
+ "koffer-cryptography",
  "koffer-testutil",
  "koffer-wire",
  "ml-dsa",
@@ -690,7 +690,7 @@ version = "0.1.0"
 dependencies = [
  "cc",
  "hbs-lms",
- "koffer-crypto",
+ "koffer-cryptography",
  "ml-dsa",
  "ml-kem",
  "oqs",

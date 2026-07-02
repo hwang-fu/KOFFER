@@ -1,4 +1,4 @@
-use crypto::profile::CryptoProfile;
+use koffer_cryptography::profile::CryptoProfile;
 use koffer_wire::{
     alg::AlgId,
     ascii::AsciiStr,

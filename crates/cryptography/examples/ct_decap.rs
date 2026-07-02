@@ -1,7 +1,7 @@
 //! dudect-style constant-time timing harness for ML-KEM decapsulation.
 //! Best-effort empirical evidence that decapsulation does not leak through timing, within
 //! the measured budget -- not a proof. Run with:
-//!   cargo run -p koffer-crypto --release --example ct_decap
+//!   cargo run -p koffer-cryptography --release --example ct_decap
 //!
 //! Method: dudect's fixed-vs-random t-test. The secret decapsulation key is fixed. The
 //! `Left` class decapsulates one fixed VALID ciphertext (the real-secret path); the `Right`
@@ -17,7 +17,7 @@
 use core::convert::Infallible;
 
 use dudect_bencher::{BenchRng, Class, CtRunner, ctbench_main, rand::RngExt};
-use koffer_crypto::{
+use koffer_cryptography::{
     kem::{Ciphertext, Kem},
     mlkem::MlKem,
 };
@@ -29,7 +29,7 @@ const SAMPLES: usize = 100_000;
 
 // A deterministic rand_core 0.10 RNG, used only for the one-off prep encapsulation that
 // builds the fixed valid ciphertext. The harness's own `BenchRng` is a different rand_core
-// version, so it cannot drive `koffer-crypto`'s `encapsulate`.
+// version, so it cannot drive `koffer-cryptography`'s `encapsulate`.
 struct PrepRng(u64);
 impl rand_core::TryRng for PrepRng {
     type Error = Infallible;

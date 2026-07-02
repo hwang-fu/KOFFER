@@ -1,4 +1,4 @@
-//! Differential tests for the ML-KEM decapsulate path: our `koffer-crypto` backend
+//! Differential tests for the ML-KEM decapsulate path: our `koffer-cryptography` backend
 //! against the independent `oqs` (liboqs) reference.
 //!
 //! Three groups: the Wycheproof decapsulation vectors replayed through both backends,

@@ -6,7 +6,7 @@
 //! -- all per-scheme knowledge lives in the two dispatch helpers at the bottom, so the
 //! profile is the only switch. The general signer is ML-DSA.
 
-use crypto::{
+use koffer_cryptography::{
     alg::SigAlg,
     mldsa::MlDsa,
     profile::CryptoProfile,
