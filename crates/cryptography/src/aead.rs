@@ -11,14 +11,7 @@
 //! primitive never generates one, which keeps responsibility for using a fresh
 //! nonce per key with the composition that owns the key.
 
-use aes_gcm::{
-    AeadInOut, Aes256Gcm as GcmCipher, KeyInit,
-    aead::{Nonce as CipherNonce, Tag as CipherTag},
-};
-// `AeadInOut`, `KeyInit`, and the `Nonce`/`Tag` array aliases above come from the `aead` crate
-// that both RustCrypto AEADs re-export, so the ChaCha20-Poly1305 cipher reuses them; only the
-// concrete cipher type differs.
-use chacha20poly1305::ChaCha20Poly1305 as ChaChaCipher;
+use aes_gcm::{AeadInOut, KeyInit};
 use koffer_common::bytes::Bytes;
 use koffer_derive::{ByteNewtype, SecretByteNewtype};
 
@@ -76,19 +69,20 @@ pub trait Aead {
 // only by which RustCrypto cipher they instantiate (both share the `aead` crate traits).
 
 /// Loads an AEAD cipher from a key, mapping a wrong-length key to `MalformedKey`.
-fn load_cipher<C: KeyInit>(key: &Key) -> Result<C, AeadError> {
+fn load_cipher<C>(key: &Key) -> Result<C, AeadError>
+where
+    C: KeyInit,
+{
     C::new_from_slice(key.as_slice()).map_err(|_| AeadError::MalformedKey)
 }
 
 /// Seals `buffer` in place with cipher `C` and returns the detached tag.
-fn seal_with<C: AeadInOut + KeyInit>(
-    key: &Key,
-    nonce: &Nonce,
-    aad: &[u8],
-    buffer: &mut [u8],
-) -> Result<Tag, AeadError> {
+fn seal_with<C>(key: &Key, nonce: &Nonce, aad: &[u8], buffer: &mut [u8]) -> Result<Tag, AeadError>
+where
+    C: AeadInOut + KeyInit,
+{
     let cipher = load_cipher::<C>(key)?;
-    let nonce: &CipherNonce<C> = nonce
+    let nonce: &aes_gcm::aead::Nonce<C> = nonce
         .as_slice()
         .try_into()
         .map_err(|_| AeadError::MalformedNonce)?;
@@ -99,21 +93,24 @@ fn seal_with<C: AeadInOut + KeyInit>(
 }
 
 /// Verifies `tag` over `buffer` and `aad`, then decrypts `buffer` in place with cipher `C`.
-fn unseal_with<C: AeadInOut + KeyInit>(
+fn unseal_with<C>(
     key: &Key,
     nonce: &Nonce,
     aad: &[u8],
     buffer: &mut [u8],
     tag: &Tag,
-) -> Result<(), AeadError> {
+) -> Result<(), AeadError>
+where
+    C: AeadInOut + KeyInit,
+{
     let cipher = load_cipher::<C>(key)?;
-    let nonce: &CipherNonce<C> = nonce
+    let nonce: &aes_gcm::aead::Nonce<C> = nonce
         .as_slice()
         .try_into()
         .map_err(|_| AeadError::MalformedNonce)?;
     // A wrong-length tag cannot authenticate, so it is reported as a plain
     // unseal failure rather than a distinct error.
-    let tag: &CipherTag<C> = tag
+    let tag: &aes_gcm::aead::Tag<C> = tag
         .as_slice()
         .try_into()
         .map_err(|_| AeadError::UnsealFailed)?;
@@ -133,7 +130,7 @@ impl Aead for Aes256Gcm {
         aad: &[u8],
         buffer: &mut [u8],
     ) -> Result<Tag, AeadError> {
-        seal_with::<GcmCipher>(key, nonce, aad, buffer)
+        seal_with::<aes_gcm::Aes256Gcm>(key, nonce, aad, buffer)
     }
 
     fn unseal(
@@ -144,7 +141,7 @@ impl Aead for Aes256Gcm {
         buffer: &mut [u8],
         tag: &Tag,
     ) -> Result<(), AeadError> {
-        unseal_with::<GcmCipher>(key, nonce, aad, buffer, tag)
+        unseal_with::<aes_gcm::Aes256Gcm>(key, nonce, aad, buffer, tag)
     }
 }
 
@@ -159,7 +156,7 @@ impl Aead for ChaCha20Poly1305 {
         aad: &[u8],
         buffer: &mut [u8],
     ) -> Result<Tag, AeadError> {
-        seal_with::<ChaChaCipher>(key, nonce, aad, buffer)
+        seal_with::<chacha20poly1305::ChaCha20Poly1305>(key, nonce, aad, buffer)
     }
 
     fn unseal(
@@ -170,7 +167,7 @@ impl Aead for ChaCha20Poly1305 {
         buffer: &mut [u8],
         tag: &Tag,
     ) -> Result<(), AeadError> {
-        unseal_with::<ChaChaCipher>(key, nonce, aad, buffer, tag)
+        unseal_with::<chacha20poly1305::ChaCha20Poly1305>(key, nonce, aad, buffer, tag)
     }
 }
 
