@@ -2,7 +2,7 @@
 //! run in both crypto profiles, with tamper-negative cases on each path.
 
 use koffer_cryptography::profile::CryptoProfile;
-use koffer_demo::{run, seal, sign};
+use koffer_demonstration::{run, seal, sign};
 use koffer_testutil::TestRng;
 use koffer_wire::{
     alg::AlgId,
