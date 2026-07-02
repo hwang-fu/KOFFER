@@ -262,7 +262,7 @@ impl MlKemReference for MlKemNative {
 
         // Buffer sizes are fixed per parameter set, so expand per level. `pk` is written by
         // the keypair derivation but unused afterward -- only `sk` feeds decapsulation.
-        macro_rules! decapsulate_with {
+        macro_rules! decapsulate_native {
             ($pk_len:literal, $sk_len:literal, $ct_len:literal, $keypair:ident, $dec:ident) => {{
                 if ciphertext.len() != $ct_len {
                     return None;
@@ -287,10 +287,10 @@ impl MlKemReference for MlKemNative {
 
         match set {
             MlKemSet::MlKem768 => {
-                decapsulate_with!(1184, 2400, 1088, mlkem768_keypair_derand, mlkem768_dec)
+                decapsulate_native!(1184, 2400, 1088, mlkem768_keypair_derand, mlkem768_dec)
             }
             MlKemSet::MlKem1024 => {
-                decapsulate_with!(1568, 3168, 1568, mlkem1024_keypair_derand, mlkem1024_dec)
+                decapsulate_native!(1568, 3168, 1568, mlkem1024_keypair_derand, mlkem1024_dec)
             }
         }
     }
