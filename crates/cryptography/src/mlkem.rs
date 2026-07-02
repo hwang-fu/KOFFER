@@ -31,7 +31,7 @@ impl<P> Default for MlKem<P> {
 
 // `ml-kem`'s parameter bound (`KemParams`) is private, so a generic `impl` cannot name
 // it. We generate a concrete keygen + `Kem` impl per parameter set instead.
-macro_rules! impl_backend {
+macro_rules! impl_mlkem_backend {
     ($param:ty) => {
         impl MlKem<$param> {
             /// Generates a key pair from `entropy`, which must be at least 64 bytes -- the
@@ -101,8 +101,8 @@ macro_rules! impl_backend {
     };
 }
 
-impl_backend!(ml_kem::MlKem768);
-impl_backend!(ml_kem::MlKem1024);
+impl_mlkem_backend!(ml_kem::MlKem768);
+impl_mlkem_backend!(ml_kem::MlKem1024);
 
 #[cfg(test)]
 mod tests {

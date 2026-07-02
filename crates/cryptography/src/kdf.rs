@@ -46,7 +46,7 @@ impl<H> Default for Hkdf<H> {
 
 /// Generates a concrete `Kdf` impl for `Hkdf<$hash>`. One impl per hash: the
 /// useful `hkdf` bound is sealed, so a single generic impl is not nameable here.
-macro_rules! impl_backend {
+macro_rules! impl_hkdf_backend {
     ($hash:ty) => {
         impl Kdf for Hkdf<$hash> {
             fn derive(
@@ -67,8 +67,8 @@ macro_rules! impl_backend {
     };
 }
 
-impl_backend!(Sha256);
-impl_backend!(Sha384);
+impl_hkdf_backend!(Sha256);
+impl_hkdf_backend!(Sha384);
 
 #[cfg(test)]
 mod tests {

@@ -79,7 +79,7 @@ fn join<'b>(buf: &'b mut [u8], head: &[u8], tail: &[u8; 32]) -> Result<&'b [u8],
 
 /// Generates a concrete hybrid backend for one (ML-KEM parameter set, hash, label)
 /// triple: a unit struct with `keygen` plus the `Kem` encapsulate / decapsulate.
-macro_rules! impl_backend {
+macro_rules! impl_hybrid_backend {
     ($name:ident, $mlkem:ty, $hash:ty, $label:expr) => {
         /// A hybrid KEM backend combining X25519 with ML-KEM.
         pub struct $name;
@@ -192,8 +192,8 @@ macro_rules! impl_backend {
     };
 }
 
-impl_backend!(X25519MlKem768, MlKem768, Sha256, LABEL_768);
-impl_backend!(X25519MlKem1024, MlKem1024, Sha384, LABEL_1024);
+impl_hybrid_backend!(X25519MlKem768, MlKem768, Sha256, LABEL_768);
+impl_hybrid_backend!(X25519MlKem1024, MlKem1024, Sha384, LABEL_1024);
 
 #[cfg(test)]
 mod tests {
