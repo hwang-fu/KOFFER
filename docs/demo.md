@@ -1,6 +1,6 @@
 # End-to-end software demo
 
-This is the first crate that wires the protocol crate (`koffer-proto`) and the crypto crate (`koffer-crypto`) together. It runs the full signing-and-sealing flow in software, in both crypto profiles, and prints a short trace of every step.
+This is the first crate that wires the protocol crate (`koffer-wire`) and the crypto crate (`koffer-cryptography`) together. It runs the full signing-and-sealing flow in software, in both crypto profiles, and prints a short trace of every step.
 
 The flow has two halves. First it builds a firmware-update manifest, signs it, and verifies the signature. Then it encrypts ("seals") a payload to a fresh recipient key and decrypts ("opens") it again. A few terms used below:
 
@@ -11,7 +11,7 @@ The flow has two halves. First it builds a firmware-update manifest, signs it, a
 ## Run it
 
 ```sh
-cargo run -p koffer-demo
+cargo run -p koffer-demonstration
 ```
 
 Output:

@@ -24,17 +24,17 @@ A post-quantum hardware root of trust and security module, written in Rust.
 
 | Folder | Package | Description |
 |--------|---------|-------------|
-| `crates/base` | `koffer-base` | Shared foundation primitives reused across crates (`no_std`). |
-| `crates/proto` | `koffer-proto` | Shared protocol types, wire formats, and messages (`no_std`). |
-| `crates/crypto` | `koffer-crypto` | Post-quantum crypto primitives and agility traits (`no_std`). |
+| `crates/common` | `koffer-common` | Shared foundation primitives reused across crates (`no_std`). |
+| `crates/wire` | `koffer-wire` | Shared protocol types, wire formats, and messages (`no_std`). |
+| `crates/cryptography` | `koffer-cryptography` | Post-quantum crypto primitives and agility traits (`no_std`). |
 
-Folder names are short for readability, but each crate's package keeps the `koffer-` prefix so the names stay unambiguous in tooling and publishable. A consumer renames the dependency locally for clean `use` paths:
+Folder names are short for readability; each crate's package keeps the `koffer-` prefix so the names stay unambiguous in tooling and publishable. A consumer depends on a crate by its package name and imports it under that same name:
 
 ```toml
-proto = { package = "koffer-proto", path = "../proto" }
+koffer-wire = { path = "../wire" }
 ```
 
-so code reads `use proto::...` instead of `use koffer_proto::...`.
+so code reads `use koffer_wire::...`.
 
 ## Building
 
@@ -45,7 +45,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all --check
 
 # embedded (Cortex-M33F)
-cargo build --target thumbv8m.main-none-eabihf -p koffer-base -p koffer-proto -p koffer-crypto
+cargo build --target thumbv8m.main-none-eabihf -p koffer-common -p koffer-wire -p koffer-cryptography
 ```
 
 The toolchain -- Rust 1.96.0, the `clippy` and `rustfmt` components, and the `thumbv8m.main-none-eabihf` target -- is pinned in `rust-toolchain.toml`, so `rustup` provisions it automatically on the first build.
@@ -55,7 +55,7 @@ The toolchain -- Rust 1.96.0, the `clippy` and `rustfmt` components, and the `th
 Run the full sign/verify and seal/open flow in software, in both crypto profiles:
 
 ```sh
-cargo run -p koffer-demo
+cargo run -p koffer-demonstration
 ```
 
 See [docs/demo.md](docs/demo.md) for a step-by-step walkthrough.
