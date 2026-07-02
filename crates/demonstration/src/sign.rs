@@ -12,13 +12,13 @@ use koffer_cryptography::{
     profile::CryptoProfile,
     sign::{Signature, Signer, SigningKey, Verifier, VerifyingKey},
 };
-use ml_dsa::{MlDsa65, MlDsa87};
 use koffer_wire::{
     alg::AlgId,
     codec,
     cose::{CoseSign1, Payload, SigStructure},
     manifest::Manifest,
 };
+use ml_dsa::{MlDsa65, MlDsa87};
 
 /// Signs `manifest` under `profile`'s signature algorithm; returns the encoded
 /// `COSE_Sign1` and the verifying key needed to check it.

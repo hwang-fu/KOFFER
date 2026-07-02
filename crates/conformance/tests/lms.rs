@@ -6,12 +6,12 @@
 //! harness catches a disagreeing reference. Showcase profile only -- hash-sigs implements
 //! full SHA-256, not the SHA-256/192 set our CNSA20 profile uses.
 
+use hbs_lms::Sha256_256;
+use koffer_conformance::{HashSigs, LmsReference, Mismatch, differential_lms_verify, kat};
 use koffer_cryptography::{
     lms::{Lms, showcase_params},
     sign::{SigningKey, StatefulSigner, VerifyingKey},
 };
-use hbs_lms::Sha256_256;
-use koffer_conformance::{HashSigs, LmsReference, Mismatch, differential_lms_verify, kat};
 use proptest::prelude::*;
 
 const TC1: &str = include_str!("../../../kat/lms/rfc8554-tc1.kat");
