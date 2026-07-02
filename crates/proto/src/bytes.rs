@@ -2,12 +2,12 @@
 
 use core::ops::Deref;
 
-use base::bytes::{Bytes, BytesError};
+use koffer_common::bytes::{Bytes, BytesError};
 use minicbor::encode::Write;
 
 /// A wire byte string of at most `MAX` bytes.
 ///
-/// Wraps a `base::Bytes<MAX>` (the no-heap storage) and adds the CBOR encoding:
+/// Wraps a `koffer_common::Bytes<MAX>` (the no-heap storage) and adds the CBOR encoding:
 /// it encodes as a CBOR byte string, and decoding rejects any byte string longer
 /// than `MAX`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]

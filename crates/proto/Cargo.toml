@@ -11,8 +11,8 @@ std = ["alloc"]
 alloc = ["minicbor/alloc"]
 
 [dependencies]
-base = { package = "koffer-base", path = "../base" }
 heapless = { version = "0.9.3", default-features = false }
+koffer-common = { path = "../common" }
 minicbor = { version = "2.2.2", default-features = false, features = [
     "derive",
 ] }

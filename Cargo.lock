@@ -644,7 +644,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "koffer-base"
+name = "koffer-common"
 version = "0.1.0"
 dependencies = [
  "heapless",
@@ -661,7 +661,7 @@ dependencies = [
  "dudect-bencher",
  "hbs-lms",
  "hkdf",
- "koffer-base",
+ "koffer-common",
  "koffer-testutil",
  "ml-dsa",
  "ml-kem",
@@ -702,7 +702,7 @@ name = "koffer-proto"
 version = "0.1.0"
 dependencies = [
  "heapless",
- "koffer-base",
+ "koffer-common",
  "minicbor",
  "proptest",
 ]

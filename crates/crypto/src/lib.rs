@@ -4,7 +4,7 @@
 //!
 //! # Secret hygiene and constant-time conventions
 //!
-//! - **Secrets compare in constant time.** The secret value types wrap `base::Bytes`,
+//! - **Secrets compare in constant time.** The secret value types wrap `koffer_common::Bytes`,
 //!   whose `PartialEq` routes through `ConstantTimeEq`, so comparing keys or shared
 //!   secrets does not leak their contents through timing.
 //! - **Secrets wipe on drop and redact their `Debug`.** `SigningKey`, `DecapsulationKey`,
@@ -20,14 +20,14 @@
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
-/// Defines a byte-backed crypto value: a distinct newtype over `base::Bytes<MAX>`,
-/// constructed from a length-checked byte slice and -- via `base::Bytes` -- compared
+/// Defines a byte-backed crypto value: a distinct newtype over `koffer_common::Bytes<MAX>`,
+/// constructed from a length-checked byte slice and -- via `koffer_common::Bytes` -- compared
 /// in constant time. Used for the value types in `sign` and `kem`.
 macro_rules! bytes_newtype {
     ($(#[$attr:meta])* $name:ident, $max:ident) => {
         $(#[$attr])*
         #[derive(Debug, Clone, PartialEq, Eq)]
-        pub struct $name(base::bytes::Bytes<$max>);
+        pub struct $name(koffer_common::bytes::Bytes<$max>);
 
         impl $name {
             /// Returns the value's bytes.
@@ -37,10 +37,10 @@ macro_rules! bytes_newtype {
         }
 
         impl TryFrom<&[u8]> for $name {
-            type Error = base::bytes::BytesError;
+            type Error = koffer_common::bytes::BytesError;
 
-            fn try_from(bytes: &[u8]) -> Result<Self, base::bytes::BytesError> {
-                base::bytes::Bytes::try_from(bytes).map(Self)
+            fn try_from(bytes: &[u8]) -> Result<Self, koffer_common::bytes::BytesError> {
+                koffer_common::bytes::Bytes::try_from(bytes).map(Self)
             }
         }
     };
@@ -52,7 +52,7 @@ macro_rules! secret_bytes_newtype {
     ($(#[$attr:meta])* $name:ident, $max:ident) => {
         $(#[$attr])*
         #[derive(Clone, PartialEq, Eq)]
-        pub struct $name(base::bytes::Bytes<$max>);
+        pub struct $name(koffer_common::bytes::Bytes<$max>);
 
         impl $name {
             /// Returns the value's bytes.
@@ -62,10 +62,10 @@ macro_rules! secret_bytes_newtype {
         }
 
         impl TryFrom<&[u8]> for $name {
-            type Error = base::bytes::BytesError;
+            type Error = koffer_common::bytes::BytesError;
 
-            fn try_from(bytes: &[u8]) -> Result<Self, base::bytes::BytesError> {
-                base::bytes::Bytes::try_from(bytes).map(Self)
+            fn try_from(bytes: &[u8]) -> Result<Self, koffer_common::bytes::BytesError> {
+                koffer_common::bytes::Bytes::try_from(bytes).map(Self)
             }
         }
 
