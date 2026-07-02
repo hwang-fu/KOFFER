@@ -12,7 +12,6 @@ pub mod ascii;
 pub mod bytes;
 pub mod codec;
 pub mod cose;
-pub mod digest;
 pub mod error;
 pub mod frame;
 pub mod manifest;
