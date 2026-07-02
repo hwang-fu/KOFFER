@@ -557,7 +557,7 @@ mod tests {
 
     #[test]
     fn rejects_non_ascii_kid() {
-        // unprotected {4: "café"} -- the kid's 'é' (c3 a9) is non-ASCII -> F15 reject.
+        // unprotected {4: "café"} -- the kid's 'é' (c3 a9) is non-ASCII -> reject.
         let wire = [
             0x84, 0x43, 0xa1, 0x01, 0x26, // array(4), protected bstr{1:-7}
             0xa1, 0x04, 0x65, 0x63, 0x61, 0x66, 0xc3, 0xa9, // {4: "café"}
@@ -641,7 +641,7 @@ mod tests {
 
     #[test]
     fn recipient_rejects_non_ascii_kid() {
-        // {4: "café"} -- non-ASCII kid -> F15 reject.
+        // {4: "café"} -- non-ASCII kid -> reject.
         let wire = [
             0x83, 0x43, 0xa1, 0x01, 0x26, // array(3), protected bstr{1:-7}
             0xa1, 0x04, 0x65, 0x63, 0x61, 0x66, 0xc3, 0xa9, // {4: "café"}
@@ -686,7 +686,7 @@ mod tests {
 
     #[test]
     fn cose_encrypt_rejects_non_ascii_recipient_kid() {
-        // The nested recipient's kid {4: "café"} is non-ASCII -> F15 reject.
+        // The nested recipient's kid {4: "café"} is non-ASCII -> reject.
         let wire = [
             0x84, 0x43, 0xa1, 0x01, 0x26, 0xa1, 0x05, 0x42, 0xAA, 0xBB, 0x42, 0xCC, 0xDD, 0x81,
             0x83, 0x43, 0xa1, 0x01, 0x26, 0xa1, 0x04, 0x65, 0x63, 0x61, 0x66, 0xc3, 0xa9, 0x42,

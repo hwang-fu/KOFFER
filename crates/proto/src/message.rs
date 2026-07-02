@@ -3,7 +3,7 @@
 //! Each message encodes as a flat CBOR array led by an integer tag: `[tag, ...fields]`.
 //! `Request` (host -> device) and `Response` (device -> host) are separate enums with
 //! separate tag spaces; the body bytes travel inside a frame (see the `frame` module).
-//! Text fields are printable-ASCII (F15); byte fields borrow the input, zero-copy, like
+//! Text fields are printable-ASCII; byte fields borrow the input, zero-copy, like
 //! the COSE and manifest types.
 
 use minicbor::{Encode, encode::Write};
@@ -651,7 +651,7 @@ mod tests {
 
     #[test]
     fn rejects_non_ascii_info_fw() {
-        // Info with a non-ASCII fw string -> F15 reject.
+        // Info with a non-ASCII fw string -> reject.
         let wire = [
             0x86,
             ResponseTag::Info as u8, // array(6), Info tag
@@ -668,7 +668,7 @@ mod tests {
 
     #[test]
     fn rejects_non_ascii_sign_summary() {
-        // Sign with valid alg + digest, then a non-ASCII summary -> F15 reject.
+        // Sign with valid alg + digest, then a non-ASCII summary -> reject.
         let wire = [
             0x84,
             RequestTag::Sign as u8, // array(4), Sign tag
