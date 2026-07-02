@@ -13,7 +13,7 @@ use zeroize::Zeroize;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BytesError {
     /// The byte sequence is longer than the buffer's maximum length `MAX`.
-    TooLong { len: usize, max: usize },
+    TooLong { got: usize, max: usize },
     /// An exact-length constructor received a sequence of the wrong length.
     WrongLength { expected: usize, got: usize },
     /// A hex string contained a character that is not a hex digit.
@@ -25,10 +25,10 @@ pub enum BytesError {
 impl fmt::Display for BytesError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            BytesError::TooLong { len, max } => {
+            BytesError::TooLong { got, max } => {
                 write!(
                     f,
-                    "byte sequence of {len} bytes exceeds the maximum of {max}"
+                    "byte sequence of {got} bytes exceeds the maximum of {max}"
                 )
             }
             BytesError::WrongLength { expected, got } => {
@@ -101,7 +101,7 @@ impl<const MAX: usize> Bytes<MAX> {
                 index: 2 * pair_index + 1,
             })?;
             out.push((hi << 4) | lo).map_err(|_| BytesError::TooLong {
-                len: hex.len() / 2,
+                got: hex.len() / 2,
                 max: MAX,
             })?;
         }
@@ -116,7 +116,7 @@ impl<const MAX: usize> TryFrom<&[u8]> for Bytes<MAX> {
         heapless::Vec::from_slice(bytes)
             .map(Self)
             .map_err(|_| BytesError::TooLong {
-                len: bytes.len(),
+                got: bytes.len(),
                 max: MAX,
             })
     }
@@ -183,7 +183,7 @@ mod tests {
     fn rejects_over_max() {
         let bytes = [0u8; 5];
         let r = Bytes::<4>::try_from(&bytes[..]);
-        assert_eq!(r, Err(BytesError::TooLong { len: 5, max: 4 }));
+        assert_eq!(r, Err(BytesError::TooLong { got: 5, max: 4 }));
     }
 
     #[test]
@@ -221,7 +221,7 @@ mod tests {
         );
         assert_eq!(
             Bytes::<2>::from_hex("01020304"),
-            Err(BytesError::TooLong { len: 4, max: 2 })
+            Err(BytesError::TooLong { got: 4, max: 2 })
         );
     }
 
